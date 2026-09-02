@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --terp-red: #e03a3e;
+  --terp-gold: #ffd520;
+  --terp-black: #151515;
+}
+
+body {
+  background: linear-gradient(160deg, #0d0d0d 0%, #1a1a1a 40%, #151515 100%);
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10;
+  }
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 32, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 213, 32, 0); }
+}
+
+.pulse-gold {
+  animation: pulse-gold 2s ease-in-out infinite;
+}
