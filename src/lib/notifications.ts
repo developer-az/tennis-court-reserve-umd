@@ -27,6 +27,72 @@ export async function sendDiscordWebhook(
   }
 }
 
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
+export async function sendEmail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  bookingUrl?: string;
+}): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("RESEND_API_KEY not set — skipping email");
+    return false;
+  }
+
+  const from = process.env.EMAIL_FROM ?? "UMD Tennis Alerts <onboarding@resend.dev>";
+  const html = `
+    <div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;padding:24px;background:#151515;color:#fff;border-radius:12px;">
+      <h1 style="color:#FFD520;font-size:22px;margin:0 0 12px;">${escapeHtml(input.subject)}</h1>
+      <p style="color:#ddd;font-size:16px;line-height:1.5;margin:0 0 20px;">${escapeHtml(input.text)}</p>
+      ${
+        input.bookingUrl
+          ? `<a href="${escapeHtml(input.bookingUrl)}" style="display:inline-block;background:#E03A3E;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">Book court on Planyo</a>`
+          : ""
+      }
+      <p style="color:#888;font-size:12px;margin-top:24px;">UMD Tennis Court Alerts · Eppley Recreation Center</p>
+    </div>
+  `;
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [input.to],
+        subject: input.subject,
+        text: input.text + (input.bookingUrl ? `\n\nBook: ${input.bookingUrl}` : ""),
+        html,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("Resend error:", res.status, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Resend send failed:", err);
+    return false;
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function formatHour(hour: number): string {
   const h = hour % 12 || 12;
   const ampm = hour < 12 ? "AM" : "PM";
@@ -47,7 +113,7 @@ export function buildOpenNotification(date: string, hour: number, courtsAvailabl
   const label = formatSlotLabel(date, hour);
   const bookingUrl = buildBookingLink(date, hour);
   return {
-    title: "🎾 Court slot is now open for booking!",
+    title: "Court slot is now open for booking!",
     message: `${label} — ${courtsAvailable} of ${PLANYO.COURT_COUNT} courts available. Book within 48 hours before play time.`,
     bookingUrl,
   };
@@ -61,8 +127,44 @@ export function buildAvailableNotification(date: string, hour: number, courtsAva
   const label = formatSlotLabel(date, hour);
   const bookingUrl = buildBookingLink(date, hour);
   return {
-    title: "✅ Court became available!",
+    title: "Court became available!",
     message: `${label} — ${courtsAvailable} court${courtsAvailable !== 1 ? "s" : ""} now open. Someone may have cancelled.`,
     bookingUrl,
   };
+}
+
+export async function deliverAlert(input: {
+  email?: string | null;
+  discordWebhook?: string | null;
+  title: string;
+  message: string;
+  bookingUrl: string;
+  discordColor?: number;
+  extraDiscord?: string;
+}): Promise<void> {
+  const tasks: Promise<unknown>[] = [];
+
+  if (input.email) {
+    tasks.push(
+      sendEmail({
+        to: input.email,
+        subject: input.title,
+        text: input.message,
+        bookingUrl: input.bookingUrl,
+      })
+    );
+  }
+
+  if (input.discordWebhook) {
+    tasks.push(
+      sendDiscordWebhook(input.discordWebhook, {
+        title: input.title,
+        description: input.message + (input.extraDiscord ?? ""),
+        url: input.bookingUrl,
+        color: input.discordColor,
+      })
+    );
+  }
+
+  await Promise.all(tasks);
 }

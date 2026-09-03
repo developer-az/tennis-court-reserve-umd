@@ -2,7 +2,7 @@ import { addNotification, getActiveWatches, markWatchTriggered, updateWatchAvail
 import {
   buildAvailableNotification,
   buildOpenNotification,
-  sendDiscordWebhook,
+  deliverAlert,
 } from "./notifications";
 import { getOpensAt, isSlotOpenForBooking, parseSlotDateTime, searchSlot } from "./planyo";
 
@@ -33,13 +33,13 @@ function shouldNotify(watchId: number, type: string): boolean {
 }
 
 export async function runPoll(now = new Date()): Promise<PollResult> {
-  const watches = getActiveWatches();
+  const watches = await getActiveWatches();
   const result: PollResult = { checked: watches.length, triggered: 0, events: [] };
 
   for (const watch of watches) {
     const slotStart = parseSlotDateTime(watch.date, watch.hour);
     if (slotStart <= now) {
-      markWatchTriggered(watch.id);
+      await markWatchTriggered(watch.id);
       continue;
     }
 
@@ -51,20 +51,23 @@ export async function runPoll(now = new Date()): Promise<PollResult> {
       const msSinceOpen = now.getTime() - opensAt.getTime();
       if (msSinceOpen < 10 * 60 * 1000 && shouldNotify(watch.id, "slot_opened")) {
         const notif = buildOpenNotification(watch.date, watch.hour, courtsAvailable);
-        addNotification({
+        await addNotification({
           watchId: watch.id,
           type: "slot_opened",
           message: notif.message,
           courtsAvailable,
         });
 
-        if (watch.discordWebhook) {
-          await sendDiscordWebhook(watch.discordWebhook, {
-            title: notif.title,
-            description: notif.message + (available ? "\n\n**Book now before it's gone!**" : `\n\n⚠️ ${reason ?? "May be fully booked"}`),
-            url: notif.bookingUrl,
-          });
-        }
+        await deliverAlert({
+          email: watch.email,
+          discordWebhook: watch.discordWebhook,
+          title: notif.title,
+          message: notif.message,
+          bookingUrl: notif.bookingUrl,
+          extraDiscord: available
+            ? "\n\n**Book now before it's gone!**"
+            : `\n\n⚠️ ${reason ?? "May be fully booked"}`,
+        });
 
         result.triggered++;
         result.events.push({
@@ -79,25 +82,25 @@ export async function runPoll(now = new Date()): Promise<PollResult> {
     if (watch.notifyOnAvailable && available && courtsAvailable > 0 && isOpen) {
       const prev = watch.lastCourtsAvailable;
       const increased = prev === null ? false : courtsAvailable > prev;
-      updateWatchAvailability(watch.id, courtsAvailable);
+      await updateWatchAvailability(watch.id, courtsAvailable);
 
       if (increased && shouldNotify(watch.id, "court_available")) {
         const notif = buildAvailableNotification(watch.date, watch.hour, courtsAvailable);
-        addNotification({
+        await addNotification({
           watchId: watch.id,
           type: "court_available",
           message: notif.message,
           courtsAvailable,
         });
 
-        if (watch.discordWebhook) {
-          await sendDiscordWebhook(watch.discordWebhook, {
-            title: notif.title,
-            description: notif.message,
-            url: notif.bookingUrl,
-            color: 0x22c55e,
-          });
-        }
+        await deliverAlert({
+          email: watch.email,
+          discordWebhook: watch.discordWebhook,
+          title: notif.title,
+          message: notif.message,
+          bookingUrl: notif.bookingUrl,
+          discordColor: 0x22c55e,
+        });
 
         result.triggered++;
         result.events.push({
@@ -108,7 +111,7 @@ export async function runPoll(now = new Date()): Promise<PollResult> {
         });
       }
     } else {
-      updateWatchAvailability(watch.id, courtsAvailable);
+      await updateWatchAvailability(watch.id, courtsAvailable);
     }
   }
 

@@ -44,6 +44,35 @@ export default function Dashboard() {
     setWatches(data.watches ?? []);
   }, []);
 
+  const showBrowserAlerts = useCallback((notifs: typeof notifications) => {
+    if (localStorage.getItem("browserNotify") !== "true" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    for (const n of notifs) {
+      if (knownNotifIds.current.has(n.id)) continue;
+      knownNotifIds.current.add(n.id);
+      const bookingUrl = buildBookingLink(n.date, n.hour);
+      const notif = new Notification(
+        n.type === "slot_opened" ? "Court slot opened!" : "Court available!",
+        {
+          body: n.message,
+          icon: "/tennis.svg",
+          tag: `watch-${n.id}`,
+        }
+      );
+      notif.onclick = () => window.open(bookingUrl, "_blank");
+    }
+  }, []);
+
+  const refreshNotifications = useCallback(async () => {
+    const res = await fetch("/api/notifications");
+    const data = await res.json();
+    if (res.ok) {
+      const notifs = data.notifications ?? [];
+      setNotifications(notifs);
+      showBrowserAlerts(notifs);
+    }
+  }, [showBrowserAlerts]);
+
   const runPoll = useCallback(async () => {
     setPolling(true);
     try {
@@ -53,35 +82,13 @@ export default function Dashboard() {
         setLastPoll(new Date());
         const notifs = data.notifications ?? [];
         setNotifications(notifs);
-
-        if (localStorage.getItem("browserNotify") === "true" && "Notification" in window) {
-          for (const n of notifs) {
-            if (!knownNotifIds.current.has(n.id)) {
-              knownNotifIds.current.add(n.id);
-              if (Notification.permission === "granted") {
-                const bookingUrl = buildBookingLink(n.date, n.hour);
-                const notif = new Notification(
-                  n.type === "slot_opened" ? "Court slot opened!" : "Court available!",
-                  {
-                    body: n.message,
-                    icon: "/tennis.svg",
-                    tag: `watch-${n.id}`,
-                  }
-                );
-                notif.onclick = () => window.open(bookingUrl, "_blank");
-              }
-            }
-          }
-        }
-
-        if (data.poll?.triggered > 0) {
-          await fetchAvailability();
-        }
+        showBrowserAlerts(notifs);
+        if (data.poll?.triggered > 0) await fetchAvailability();
       }
     } finally {
       setPolling(false);
     }
-  }, [fetchAvailability]);
+  }, [fetchAvailability, showBrowserAlerts]);
 
   const refresh = useCallback(async () => {
     setError("");
@@ -99,10 +106,17 @@ export default function Dashboard() {
   }, [refresh]);
 
   useEffect(() => {
-    runPoll();
-    const interval = setInterval(runPoll, POLL_INTERVAL_MS);
+    // Local/dev: poll Planyo from the browser. Production relies on Vercel cron / external cron.
+    const useClientPoll = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_CLIENT_POLL === "true";
+    if (useClientPoll) {
+      runPoll();
+      const interval = setInterval(runPoll, POLL_INTERVAL_MS);
+      return () => clearInterval(interval);
+    }
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [runPoll]);
+  }, [runPoll, refreshNotifications]);
 
   useEffect(() => {
     const interval = setInterval(fetchAvailability, 60_000);
@@ -208,11 +222,11 @@ export default function Dashboard() {
           <h3 className="font-display text-terp-gold text-base">How it works</h3>
           <p>
             UMD uses Planyo for Eppley tennis courts. Slots open exactly <strong className="text-white">48 hours before</strong> play time.
-            Click <strong className="text-white">Watch</strong> on any slot to get notified when booking opens or when someone cancels.
+            Click <strong className="text-white">Watch</strong>, enter your email, and get alerted when booking opens or when someone cancels.
           </p>
           <p>
-            Add a Discord webhook for push alerts on your phone. Browser notifications work while this tab stays open.
-            The server checks every 30 seconds automatically.
+            Email alerts work after deploy (Resend). Optional Discord webhooks and browser notifications are also supported.
+            Production checks run every minute via cron.
           </p>
         </section>
       </main>

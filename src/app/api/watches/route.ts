@@ -2,18 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { cancelWatch, createWatch, getAllWatches } from "@/lib/db";
 import { PLANYO } from "@/lib/planyo";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function GET() {
-  const watches = getAllWatches();
+  const watches = await getAllWatches();
   return NextResponse.json({ watches });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { date, hour, label, discordWebhook, notifyOnOpen, notifyOnAvailable } = body;
+    const { date, hour, label, email, discordWebhook, notifyOnOpen, notifyOnAvailable } = body;
 
     if (!date || hour === undefined) {
       return NextResponse.json({ error: "date and hour are required" }, { status: 400 });
+    }
+
+    if (!email && !discordWebhook) {
+      return NextResponse.json(
+        { error: "Provide an email address and/or Discord webhook for notifications" },
+        { status: 400 }
+      );
+    }
+
+    if (email && !EMAIL_RE.test(String(email))) {
+      return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
     const h = Number(hour);
@@ -24,10 +37,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const watch = createWatch({
+    const watch = await createWatch({
       date,
       hour: h,
       label,
+      email: email || undefined,
       discordWebhook: discordWebhook || undefined,
       notifyOnOpen,
       notifyOnAvailable,
@@ -46,7 +60,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-  const ok = cancelWatch(Number(id));
+  const ok = await cancelWatch(Number(id));
   if (!ok) return NextResponse.json({ error: "Watch not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }
