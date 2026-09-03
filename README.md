@@ -69,7 +69,7 @@ Vercel Hobby only runs crons **once per day**. For slot-open alerts you need **e
 
 **Option B — Vercel Pro**
 
-`vercel.json` already schedules `* * * * *` on `/api/poll`. Pro plans honor that.
+Change `vercel.json` cron to `* * * * *` for every-minute checks. Hobby only allows one run per day (currently noon UTC).
 
 ## How booking works
 
