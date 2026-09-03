@@ -2,16 +2,23 @@
 /**
  * Standalone poller — run alongside the app for server-side notifications.
  * Usage: npm run poll
- * Or set up a cron job: * * * * * node scripts/poll.js
+ * Or set up a cron job / cron-job.org hitting /api/poll
  */
 
 const BASE = process.env.APP_URL ?? "http://localhost:3000";
+const SECRET = process.env.CRON_SECRET;
 
 async function poll() {
   try {
-    const res = await fetch(`${BASE}/api/poll`, { method: "POST" });
+    const headers = {};
+    if (SECRET) headers.Authorization = `Bearer ${SECRET}`;
+    const res = await fetch(`${BASE}/api/poll`, { method: "POST", headers });
     const data = await res.json();
     const ts = new Date().toISOString();
+    if (!res.ok) {
+      console.error(`[${ts}] Poll failed:`, data.error ?? res.status);
+      return;
+    }
     if (data.poll?.triggered > 0) {
       console.log(`[${ts}] Triggered ${data.poll.triggered} notification(s):`);
       for (const e of data.poll.events ?? []) {

@@ -1,28 +1,77 @@
 # UMD Tennis Court Alerts
 
-Get notified when Eppley tennis court reservation slots open on UMD's Planyo booking system.
+Get email notifications when Eppley tennis court reservation slots open on UMD's Planyo booking system.
 
 ## Features
 
 - **Live availability grid** — see which 1-hour slots have open courts (next 3 days)
-- **Slot watches** — get alerted when a slot's 48-hour booking window opens
-- **Cancellation alerts** — notified when a court becomes available (someone cancelled)
-- **Discord webhooks** — push notifications to your phone via Discord
-- **Browser notifications** — alerts while the tab is open
-- **Auto-polling** — server checks every 30 seconds
+- **Email alerts** — via [Resend](https://resend.com) when a slot opens or a court frees up
+- **Discord webhooks** — optional push to your phone
+- **Browser notifications** — while the tab is open
+- **Deployable** — Vercel + Upstash Redis + minute cron
 
-## Quick start
+## Quick start (local)
 
 ```bash
 npm install
+cp .env.example .env.local
+# Add RESEND_API_KEY from https://resend.com (free)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000), click **Watch**, enter your email.
+
+> With Resend's free `onboarding@resend.dev` sender, you can only email **your Resend account email** until you verify a domain.
+
+## Deploy to Vercel
+
+### 1. Create free accounts
+
+| Service | Why |
+|---------|-----|
+| [Resend](https://resend.com) | Send email alerts |
+| [Upstash Redis](https://upstash.com) | Persist watches (Vercel has no disk) |
+| [Vercel](https://vercel.com) | Host the Next.js app |
+
+### 2. Push & import
+
+```bash
+# from this repo
+npx vercel
+```
+
+Or: Vercel Dashboard → Add New Project → Import `developer-az/tennis-court-reserve-umd`.
+
+### 3. Set environment variables
+
+In Vercel → Project → Settings → Environment Variables:
+
+```
+RESEND_API_KEY=re_...
+EMAIL_FROM=UMD Tennis Alerts <onboarding@resend.dev>
+UPSTASH_REDIS_REST_URL=https://....upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+CRON_SECRET=long-random-string
+```
+
+Redeploy after saving.
+
+### 4. Minute polling (important)
+
+Vercel Hobby only runs crons **once per day**. For slot-open alerts you need **every minute**:
+
+**Option A — free external cron (recommended on Hobby)**
+
+1. Go to [cron-job.org](https://cron-job.org) (free)
+2. Create a job every 1 minute
+3. URL: `https://YOUR-APP.vercel.app/api/poll`
+4. Header: `Authorization: Bearer YOUR_CRON_SECRET`
+
+**Option B — Vercel Pro**
+
+`vercel.json` already schedules `* * * * *` on `/api/poll`. Pro plans honor that.
 
 ## How booking works
-
-UMD Eppley tennis courts use [Planyo](https://www.planyo.com/booking.php?calendar=36698):
 
 | Setting | Value |
 |---------|-------|
@@ -35,53 +84,26 @@ A Friday 4 PM slot opens for booking Wednesday 4 PM.
 
 ## Notifications
 
-1. Click **Watch** on any slot in the availability grid
-2. Choose what to notify on:
+1. Click **Watch** on a slot
+2. Enter your **email**
+3. Choose:
    - **On open** — when the 48h window opens
-   - **On available** — when a court frees up
-3. Optionally add a **Discord webhook** URL for mobile push
-4. Enable **browser notifications** for alerts while the tab is open
-
-### Discord setup
-
-1. In Discord: Server Settings → Integrations → Webhooks → New Webhook
-2. Copy the webhook URL
-3. Paste it when creating a watch
-
-### Background polling (optional)
-
-For notifications without keeping the browser open, run the standalone poller:
-
-```bash
-# Terminal 1
-npm run dev
-
-# Terminal 2
-npm run poll
-```
-
-Or set `APP_URL` for production:
-
-```bash
-APP_URL=https://your-domain.com npm run poll
-```
+   - **On available** — when a court frees up (cancellation)
 
 ## API
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/availability?days=3` | GET | Upcoming slot availability |
-| `/api/availability?date=2026-09-05` | GET | Slots for a specific day |
-| `/api/watches` | GET | List all watches |
-| `/api/watches` | POST | Create a watch |
-| `/api/watches?id=1` | DELETE | Cancel a watch |
-| `/api/poll` | POST | Run notification check |
-| `/api/slot?date=...&hour=...` | GET | Live slot search via Planyo |
+| `/api/watches` | GET/POST/DELETE | Manage watches |
+| `/api/notifications` | GET | Recent alerts |
+| `/api/poll` | GET/POST | Run checks (protect with `CRON_SECRET`) |
+| `/api/slot?date=...&hour=...` | GET | Live Planyo slot search |
 
-## Data
+## Local storage
 
-Watches and notifications are stored in `data/store.json` (created automatically).
+Without Upstash, watches are stored in `data/store.json` (fine for local / Railway with disk).
 
 ## Disclaimer
 
-This is an unofficial tool that reads public Planyo endpoints. It is not affiliated with UMD RecWell. Use responsibly and follow university facility policies.
+Unofficial tool using public Planyo endpoints. Not affiliated with UMD RecWell.
