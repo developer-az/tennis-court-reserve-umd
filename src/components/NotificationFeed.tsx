@@ -18,34 +18,32 @@ interface Props {
 
 function typeLabel(type: string) {
   if (type === "slot_opened") return "Opened";
-  if (type === "court_available") return "Freed up";
+  if (type === "court_available") return "Available";
   return "Update";
 }
 
 export function NotificationFeed({ notifications }: Props) {
   if (notifications.length === 0) {
     return (
-      <div className="surface rounded-xl px-5 py-8 text-center">
-        <p className="text-sm text-mute">Alerts for your watches show up here.</p>
+      <div className="panel px-4 py-6 text-center text-sm text-neutral-500">
+        No notifications yet. Alerts appear here when watched slots open.
       </div>
     );
   }
 
   return (
-    <ul className="surface max-h-72 divide-y divide-line overflow-y-auto rounded-xl">
+    <ul className="panel max-h-72 divide-y divide-neutral-200 overflow-y-auto">
       {notifications.map((n) => (
-        <li key={n.id} className="px-4 py-3">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-mute">
-            <span className={n.type === "court_available" ? "text-open" : "text-terp-gold"}>
-              {typeLabel(n.type)}
-            </span>
-            <span aria-hidden>·</span>
+        <li key={n.id} className="px-3 py-3">
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
+            <span className="font-medium text-neutral-700">{typeLabel(n.type)}</span>
+            <span>·</span>
             <span>
               {formatDateShort(n.date)} {formatHour(n.hour)}
             </span>
           </div>
-          <p className="mt-1.5 text-sm leading-snug text-ink/90">{n.message}</p>
-          <p className="mt-1 text-[11px] text-mute">
+          <p className="mt-1 text-sm text-neutral-800">{n.message}</p>
+          <p className="mt-1 text-xs text-neutral-400">
             {new Date(n.createdAt.endsWith("Z") ? n.createdAt : `${n.createdAt}Z`).toLocaleString()}
           </p>
         </li>

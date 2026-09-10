@@ -194,12 +194,12 @@ export default function Dashboard() {
 
   const healthDot =
     health.status === "ok"
-      ? "bg-open"
+      ? "bg-green-500"
       : health.status === "degraded"
         ? "bg-terp-gold"
         : health.status === "down"
-          ? "bg-full"
-          : "bg-mute";
+          ? "bg-red-500"
+          : "bg-neutral-400";
 
   const healthLabel =
     health.status === "ok"
@@ -214,20 +214,22 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b border-line/80 bg-court-bg/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="min-w-0 animate-fade">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-terp-gold">Eppley courts</p>
-            <h1 className="font-display truncate text-2xl leading-tight tracking-tight sm:text-3xl">
+      <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold sm:text-2xl">
               <span className="text-terp-red">UMD</span> Tennis Alerts
             </h1>
+            <p className="text-xs text-neutral-500">Eppley Recreation Center · 8 courts · 48h advance booking</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2 text-xs text-mute sm:flex" title="Poller health">
-              <span className={`h-1.5 w-1.5 rounded-full ${healthDot}`} />
-              {polling ? "Checking" : healthLabel}
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="hidden items-center gap-2 text-xs text-neutral-500 sm:flex" title="Poller health">
+              <span className={`h-2 w-2 rounded-full ${healthDot}`} />
+              <span>{polling ? "Checking…" : healthLabel}</span>
               {lastPoll && !polling ? (
-                <span className="text-mute/70">{lastPoll.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+                <span className="text-neutral-400">
+                  {lastPoll.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </span>
               ) : null}
             </div>
             <a href={PLANYO.BOOKING_URL} target="_blank" rel="noopener noreferrer" className="btn-primary">
@@ -237,25 +239,21 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
-        <section className="mb-8 max-w-2xl animate-rise">
-          <p className="font-display text-balance text-2xl leading-snug text-ink sm:text-3xl">
-            See what&apos;s open. Watch an hour. Get emailed when it&apos;s yours to book.
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-mute sm:text-base">
-            Slots unlock exactly 48 hours before play. Confirm your email once, then we&apos;ll alert you on open or cancellation.
-          </p>
-        </section>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        <p className="mb-5 max-w-2xl text-sm text-neutral-600">
+          Click <strong className="font-medium text-neutral-800">Watch</strong> on a slot, confirm your email, and get
+          alerted when booking opens or a court frees up.
+        </p>
 
         {(error || banner) && (
-          <div className="mb-6 space-y-2 animate-fade">
+          <div className="mb-5 space-y-2">
             {error && (
-              <div className="rounded-lg border border-full/30 bg-full/10 px-4 py-3 text-sm text-[#f0c4c5]">{error}</div>
+              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
             )}
             {banner && (
-              <div className="flex items-start justify-between gap-3 rounded-lg border border-terp-gold/25 bg-terp-gold/10 px-4 py-3 text-sm text-terp-gold">
+              <div className="flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <span>{banner}</span>
-                <button type="button" onClick={() => setBanner("")} className="text-xs text-terp-gold/70 hover:text-terp-gold">
+                <button type="button" onClick={() => setBanner("")} className="text-xs text-amber-700 hover:underline">
                   Dismiss
                 </button>
               </div>
@@ -263,16 +261,16 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.9fr)]">
-          <section className="min-w-0 animate-rise-delay">
-            <div className="mb-3 flex items-end justify-between gap-3">
-              <h2 className="font-display text-xl text-ink">Availability</h2>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.9fr)]">
+          <section className="min-w-0">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Court availability</h2>
               <button type="button" onClick={refresh} className="btn-ghost !px-2 !py-1 text-xs">
                 Refresh
               </button>
             </div>
             {loading ? (
-              <div className="surface rounded-xl px-6 py-16 text-center text-sm text-mute">Loading courts…</div>
+              <div className="panel px-6 py-12 text-center text-sm text-neutral-500">Loading courts…</div>
             ) : (
               <AvailabilityGrid
                 slots={slots}
@@ -282,25 +280,33 @@ export default function Dashboard() {
             )}
           </section>
 
-          <aside className="space-y-8 animate-rise-delay">
+          <aside className="space-y-6">
             <section>
-              <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="font-display text-xl text-ink">Your watches</h2>
-                <span className="text-xs tabular-nums text-mute">{watchCount}</span>
+              <div className="mb-2 flex items-baseline justify-between">
+                <h2 className="text-lg font-semibold">Your watches</h2>
+                <span className="text-xs text-neutral-500">{watchCount}</span>
               </div>
               <WatchList watches={watches} onCancel={handleCancelWatch} />
             </section>
             <section>
-              <h2 className="font-display mb-3 text-xl text-ink">Recent alerts</h2>
+              <h2 className="mb-2 text-lg font-semibold">Recent alerts</h2>
               <NotificationFeed notifications={notifications} />
             </section>
           </aside>
         </div>
+
+        <section className="panel mt-8 px-4 py-4 text-sm text-neutral-600">
+          <h3 className="font-semibold text-neutral-800">How it works</h3>
+          <p className="mt-1">
+            UMD opens Eppley tennis courts for booking exactly 48 hours before play time. Watch a slot to get an email
+            when it opens or when someone cancels.
+          </p>
+        </section>
       </main>
 
-      <footer className="border-t border-line/70 px-4 py-6 text-center text-xs text-mute sm:px-6">
+      <footer className="border-t border-neutral-200 bg-white px-4 py-4 text-center text-xs text-neutral-500">
         Unofficial community tool · Not affiliated with UMD, RecWell, or Planyo ·{" "}
-        <a href="/api/health" className="underline decoration-line underline-offset-2 hover:text-ink">
+        <a href="/api/health" className="underline hover:text-neutral-800">
           Status
         </a>
       </footer>

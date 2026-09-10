@@ -26,33 +26,33 @@ export function WatchList({ watches, onCancel }: Props) {
 
   if (visible.length === 0) {
     return (
-      <div className="surface rounded-xl px-5 py-8 text-center">
-        <p className="text-sm text-mute">No watches yet. Pick a slot and tap Watch.</p>
+      <div className="panel px-4 py-6 text-center text-sm text-neutral-500">
+        No active watches. Click Watch on any slot to get email alerts.
       </div>
     );
   }
 
   return (
-    <ul className="surface divide-y divide-line rounded-xl overflow-hidden">
+    <ul className="panel divide-y divide-neutral-200 overflow-hidden">
       {visible.map((w) => (
-        <li key={w.id} className="flex items-start justify-between gap-3 px-4 py-3.5">
+        <li key={w.id} className="flex items-start justify-between gap-3 px-3 py-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">
+            <p className="truncate text-sm font-medium">
               {w.label || `${formatDateShort(w.date)} · ${formatHour(w.hour)}`}
             </p>
-            <p className="mt-1 text-xs text-mute">
+            <p className="mt-0.5 text-xs text-neutral-500">
               {w.status === "pending"
-                ? "Waiting for email confirmation"
+                ? "Pending email confirmation"
                 : [
                     w.notifyOnOpen ? "On open" : null,
-                    w.notifyOnAvailable ? "On free court" : null,
+                    w.notifyOnAvailable ? "On available" : null,
                   ]
                     .filter(Boolean)
-                    .join(" · ") || "Active"}
+                    .join(" · ")}
             </p>
           </div>
-          <button type="button" onClick={() => onCancel(w.id)} className="btn-ghost shrink-0 !px-2 !py-1 text-xs">
-            Remove
+          <button type="button" onClick={() => onCancel(w.id)} className="btn-ghost !px-2 !py-1 text-xs">
+            Cancel
           </button>
         </li>
       ))}
@@ -87,7 +87,7 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
     setError("");
 
     if (!email.trim() && !discordWebhook.trim()) {
-      setError("Add an email so we can alert you");
+      setError("Add an email address to receive alerts");
       setLoading(false);
       return;
     }
@@ -132,29 +132,28 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-0 backdrop-blur-[2px] sm:items-center sm:p-4 animate-fade"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="surface w-full max-w-md rounded-t-2xl p-5 shadow-lift sm:rounded-2xl sm:p-6 animate-rise"
+        className="panel w-full max-w-md p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="watch-title"
       >
-        <div className="mb-5">
-          <p className="text-xs uppercase tracking-[0.14em] text-mute">New watch</p>
-          <h2 id="watch-title" className="font-display mt-1 text-2xl text-ink">
-            {formatDateShort(date)} · {formatHour(hour)}
-          </h2>
-          <p className="mt-2 text-sm text-mute">We&apos;ll email you when this hour opens or frees up.</p>
-        </div>
+        <h2 id="watch-title" className="text-lg font-semibold">
+          Watch this slot
+        </h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          {formatDateShort(date)} at {formatHour(hour)}
+        </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="label" htmlFor="watch-email">
-              Email
+              Email for alerts
             </label>
             <input
               id="watch-email"
@@ -168,47 +167,46 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
             />
           </div>
 
-          <fieldset className="space-y-2.5">
-            <legend className="label">Notify me</legend>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink">
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={notifyOnOpen}
                 onChange={(e) => setNotifyOnOpen(e.target.checked)}
-                className="h-4 w-4 accent-terp-red"
+                className="accent-terp-red"
               />
-              When the 48-hour booking window opens
+              Notify when booking window opens (48h before)
             </label>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={notifyOnAvailable}
                 onChange={(e) => setNotifyOnAvailable(e.target.checked)}
-                className="h-4 w-4 accent-terp-red"
+                className="accent-terp-red"
               />
-              When a court frees up (cancellation)
+              Notify when a court becomes available
             </label>
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={browserNotify}
                 onChange={(e) => setBrowserNotify(e.target.checked)}
-                className="h-4 w-4 accent-terp-red"
+                className="accent-terp-red"
               />
-              Browser alerts while this tab is open
+              Also enable browser notifications
             </label>
-          </fieldset>
+          </div>
 
           <button
             type="button"
-            className="text-xs text-mute underline-offset-2 hover:text-ink hover:underline"
+            className="text-xs text-neutral-500 underline hover:text-neutral-800"
             onClick={() => setShowAdvanced((v) => !v)}
           >
             {showAdvanced ? "Hide optional settings" : "Optional settings"}
           </button>
 
           {showAdvanced && (
-            <div className="space-y-3 rounded-lg border border-line bg-court-soft/50 p-3">
+            <div className="space-y-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
               <div>
                 <label className="label" htmlFor="watch-label">
                   Label
@@ -217,7 +215,7 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
                   id="watch-label"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
-                  placeholder="Saturday doubles"
+                  placeholder="e.g. Saturday morning doubles"
                   className="field"
                 />
               </div>
@@ -229,14 +227,14 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
                   id="watch-discord"
                   value={discordWebhook}
                   onChange={(e) => setDiscordWebhook(e.target.value)}
-                  placeholder="https://discord.com/api/webhooks/…"
+                  placeholder="https://discord.com/api/webhooks/..."
                   className="field"
                 />
               </div>
             </div>
           )}
 
-          {error && <p className="text-sm text-full">{error}</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">
@@ -247,7 +245,7 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
               disabled={loading || (!notifyOnOpen && !notifyOnAvailable)}
               className="btn-primary flex-1"
             >
-              {loading ? "Saving…" : "Start watching"}
+              {loading ? "Saving..." : "Start watching"}
             </button>
           </div>
         </form>
