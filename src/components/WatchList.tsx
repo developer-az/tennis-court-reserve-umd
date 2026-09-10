@@ -26,42 +26,37 @@ export function WatchList({ watches, onCancel }: Props) {
 
   if (visible.length === 0) {
     return (
-      <div className="glass rounded-2xl p-6 text-center text-white/50 text-sm">
-        No active watches. Click &quot;Watch&quot; on any slot to get email alerts when it opens.
+      <div className="surface rounded-xl px-5 py-8 text-center">
+        <p className="text-sm text-mute">No watches yet. Pick a slot and tap Watch.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <ul className="surface divide-y divide-line rounded-xl overflow-hidden">
       {visible.map((w) => (
-        <div
-          key={w.id}
-          className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3"
-        >
-          <div>
-            <div className="font-medium text-sm">
+        <li key={w.id} className="flex items-start justify-between gap-3 px-4 py-3.5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">
               {w.label || `${formatDateShort(w.date)} · ${formatHour(w.hour)}`}
-            </div>
-            <div className="text-xs text-white/50 mt-0.5 flex flex-wrap gap-2">
-              {w.status === "pending" ? (
-                <span className="text-terp-gold">Pending email confirmation</span>
-              ) : null}
-              {w.email ? <span>📧 {w.email}</span> : null}
-              {w.notifyOnOpen ? <span>🔔 On open</span> : null}
-              {w.notifyOnAvailable ? <span>✅ On available</span> : null}
-              {w.discordWebhook ? <span>Discord</span> : null}
-            </div>
+            </p>
+            <p className="mt-1 text-xs text-mute">
+              {w.status === "pending"
+                ? "Waiting for email confirmation"
+                : [
+                    w.notifyOnOpen ? "On open" : null,
+                    w.notifyOnAvailable ? "On free court" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Active"}
+            </p>
           </div>
-          <button
-            onClick={() => onCancel(w.id)}
-            className="text-xs text-white/40 hover:text-red-400 transition px-2 py-1"
-          >
-            Cancel
+          <button type="button" onClick={() => onCancel(w.id)} className="btn-ghost shrink-0 !px-2 !py-1 text-xs">
+            Remove
           </button>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -73,15 +68,16 @@ interface WatchFormProps {
 }
 
 export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
-  const [label, setLabel] = useState("");
   const [email, setEmail] = useState(() => {
     if (typeof window === "undefined") return "";
     return localStorage.getItem("watchEmail") ?? "";
   });
-  const [discordWebhook, setDiscordWebhook] = useState("");
   const [notifyOnOpen, setNotifyOnOpen] = useState(true);
   const [notifyOnAvailable, setNotifyOnAvailable] = useState(true);
   const [browserNotify, setBrowserNotify] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [label, setLabel] = useState("");
+  const [discordWebhook, setDiscordWebhook] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -91,7 +87,7 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
     setError("");
 
     if (!email.trim() && !discordWebhook.trim()) {
-      setError("Add an email address (or Discord webhook) to receive alerts");
+      setError("Add an email so we can alert you");
       setLoading(false);
       return;
     }
@@ -135,95 +131,123 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-0 backdrop-blur-[2px] sm:items-center sm:p-4 animate-fade"
+      onClick={onClose}
+      role="presentation"
+    >
       <div
-        className="glass rounded-2xl w-full max-w-md p-6 space-y-4"
+        className="surface w-full max-w-md rounded-t-2xl p-5 shadow-lift sm:rounded-2xl sm:p-6 animate-rise"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="watch-title"
       >
-        <h2 className="font-display text-xl text-terp-gold">Watch this slot</h2>
-        <p className="text-sm text-white/70">
-          {formatDateShort(date)} at {formatHour(hour)}
-        </p>
+        <div className="mb-5">
+          <p className="text-xs uppercase tracking-[0.14em] text-mute">New watch</p>
+          <h2 id="watch-title" className="font-display mt-1 text-2xl text-ink">
+            {formatDateShort(date)} · {formatHour(hour)}
+          </h2>
+          <p className="mt-2 text-sm text-mute">We&apos;ll email you when this hour opens or frees up.</p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 block mb-1">Email for alerts *</label>
+            <label className="label" htmlFor="watch-email">
+              Email
+            </label>
             <input
+              id="watch-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@terpmail.umd.edu"
               required={!discordWebhook}
-              className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-terp-gold/50"
+              className="field"
+              autoComplete="email"
             />
           </div>
 
-          <div>
-            <label className="text-xs text-white/50 block mb-1">Label (optional)</label>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Saturday morning doubles"
-              className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-terp-gold/50"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-white/50 block mb-1">Discord webhook (optional)</label>
-            <input
-              value={discordWebhook}
-              onChange={(e) => setDiscordWebhook(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/..."
-              className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-terp-gold/50"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <fieldset className="space-y-2.5">
+            <legend className="label">Notify me</legend>
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink">
               <input
                 type="checkbox"
                 checked={notifyOnOpen}
                 onChange={(e) => setNotifyOnOpen(e.target.checked)}
-                className="accent-terp-red"
+                className="h-4 w-4 accent-terp-red"
               />
-              Notify when booking window opens (48h before)
+              When the 48-hour booking window opens
             </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink">
               <input
                 type="checkbox"
                 checked={notifyOnAvailable}
                 onChange={(e) => setNotifyOnAvailable(e.target.checked)}
-                className="accent-terp-red"
+                className="h-4 w-4 accent-terp-red"
               />
-              Notify when a court becomes available (cancellation)
+              When a court frees up (cancellation)
             </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-ink">
               <input
                 type="checkbox"
                 checked={browserNotify}
                 onChange={(e) => setBrowserNotify(e.target.checked)}
-                className="accent-terp-red"
+                className="h-4 w-4 accent-terp-red"
               />
-              Also enable browser notifications (while tab is open)
+              Browser alerts while this tab is open
             </label>
-          </div>
+          </fieldset>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <button
+            type="button"
+            className="text-xs text-mute underline-offset-2 hover:text-ink hover:underline"
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            {showAdvanced ? "Hide optional settings" : "Optional settings"}
+          </button>
 
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-white/10 py-2 text-sm hover:bg-white/5"
-            >
+          {showAdvanced && (
+            <div className="space-y-3 rounded-lg border border-line bg-court-soft/50 p-3">
+              <div>
+                <label className="label" htmlFor="watch-label">
+                  Label
+                </label>
+                <input
+                  id="watch-label"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="Saturday doubles"
+                  className="field"
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="watch-discord">
+                  Discord webhook
+                </label>
+                <input
+                  id="watch-discord"
+                  value={discordWebhook}
+                  onChange={(e) => setDiscordWebhook(e.target.value)}
+                  placeholder="https://discord.com/api/webhooks/…"
+                  className="field"
+                />
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-full">{error}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || (!notifyOnOpen && !notifyOnAvailable)}
-              className="flex-1 rounded-lg bg-terp-red py-2 text-sm font-medium hover:bg-terp-red/80 disabled:opacity-50"
+              className="btn-primary flex-1"
             >
-              {loading ? "Saving..." : "Start watching"}
+              {loading ? "Saving…" : "Start watching"}
             </button>
           </div>
         </form>
