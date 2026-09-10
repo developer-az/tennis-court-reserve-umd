@@ -28,33 +28,32 @@ export default async function UnsubscribePage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-16">
-      <div className="surface w-full max-w-md rounded-2xl p-8 text-center shadow-lift animate-rise">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-mute">UMD Tennis Alerts</p>
-        <h1 className="font-display mt-2 text-3xl text-ink">Unsubscribe</h1>
+    <main className="flex min-h-screen items-center justify-center bg-neutral-100 px-4 py-16">
+      <div className="panel w-full max-w-md p-6 text-center shadow-sm">
+        <h1 className="text-xl font-semibold">Unsubscribe</h1>
 
         {state === "ok" && (
           <>
-            <p className="mt-4 text-sm leading-relaxed text-mute">
-              Removed <span className="text-ink">{email}</span> and cancelled {cancelled} watch
+            <p className="mt-3 text-sm text-neutral-600">
+              Removed <strong>{email}</strong> and cancelled {cancelled} watch
               {cancelled === 1 ? "" : "es"}.
             </p>
-            <p className="mt-2 text-xs text-mute">
+            <p className="mt-2 text-xs text-neutral-500">
               To opt back in later, create a watch and confirm the verification email.
             </p>
           </>
         )}
         {state === "invalid" && (
-          <p className="mt-4 text-sm text-full">This unsubscribe link is invalid or expired.</p>
+          <p className="mt-3 text-sm text-red-600">This unsubscribe link is invalid or expired.</p>
         )}
         {state === "missing" && (
-          <p className="mt-4 text-sm text-mute">Open the unsubscribe link from your alert email.</p>
+          <p className="mt-3 text-sm text-neutral-600">Open the unsubscribe link from your alert email.</p>
         )}
         {state === "error" && (
-          <p className="mt-4 text-sm text-full">Something went wrong. Try again later.</p>
+          <p className="mt-3 text-sm text-red-600">Something went wrong. Try again later.</p>
         )}
 
-        <a href="/" className="btn-secondary mt-8 inline-flex">
+        <a href="/" className="btn-secondary mt-6 inline-flex">
           Back to alerts
         </a>
       </div>
