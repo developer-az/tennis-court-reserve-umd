@@ -34,5 +34,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Build should not require live secrets
           CRON_SECRET: ci-test-secret
+          TOKEN_SECRET: ci-token-secret
+          APP_URL: http://localhost:3000

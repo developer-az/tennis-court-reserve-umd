@@ -5,9 +5,12 @@ Get email notifications when Eppley tennis court reservation slots open on UMD's
 ## Features
 
 - **Live availability grid** — see which 1-hour slots have open courts (next 3 days)
+- **Email verification** — confirm address before watches go live
 - **Email alerts** — via [Resend](https://resend.com) when a slot opens or a court frees up
+- **One-click unsubscribe** — in every alert email
 - **Discord webhooks** — optional push to your phone
 - **Browser notifications** — while the tab is open
+- **Health endpoint** — `/api/health` for cron / uptime monitors
 - **Deployable** — Vercel + Upstash Redis + minute cron
 
 ## Quick start (local)
@@ -52,7 +55,11 @@ EMAIL_FROM=UMD Tennis Alerts <onboarding@resend.dev>
 UPSTASH_REDIS_REST_URL=https://....upstash.io
 UPSTASH_REDIS_REST_TOKEN=...
 CRON_SECRET=long-random-string
+TOKEN_SECRET=another-long-random-string
+APP_URL=https://YOUR-APP.vercel.app
 ```
+
+Optional: `SENTRY_DSN` for error reporting.
 
 Redeploy after saving.
 
@@ -66,6 +73,8 @@ Vercel Hobby only runs crons **once per day**. For slot-open alerts you need **e
 2. Create a job every 1 minute
 3. URL: `https://YOUR-APP.vercel.app/api/poll`
 4. Header: `Authorization: Bearer YOUR_CRON_SECRET`
+
+Point an uptime monitor at `https://YOUR-APP.vercel.app/api/health` (expects `status: ok` when polling is fresh).
 
 **Option B — Vercel Pro**
 
@@ -85,7 +94,7 @@ A Friday 4 PM slot opens for booking Wednesday 4 PM.
 ## Notifications
 
 1. Click **Watch** on a slot
-2. Enter your **email**
+2. Enter your **email** and confirm via the verification link
 3. Choose:
    - **On open** — when the 48h window opens
    - **On available** — when a court frees up (cancellation)
@@ -98,21 +107,28 @@ A Friday 4 PM slot opens for booking Wednesday 4 PM.
 | `/api/watches?email=` | GET/POST/DELETE | Manage watches (scoped by email) |
 | `/api/notifications?email=` | GET | Your recent alerts |
 | `/api/poll` | GET/POST | Run checks (requires `CRON_SECRET` in production) |
+| `/api/health` | GET | Poller / system health (for uptime monitors) |
+| `/api/verify?token=` | GET | Confirm email (from verification message) |
+| `/unsubscribe?token=` | GET | Cancel all watches for that email |
 | `/api/slot?date=...&hour=...` | GET | Live Planyo slot search |
 
-## Safeguards (multi-user)
+## Production hardening
 
-- Watches and notifications are **email-scoped** (no public dump of all users)
-- Cancel requires matching email
-- Rate limits on API routes (Redis-backed when Upstash is configured)
+- Email-scoped watches/notifications; cancel requires matching email
+- Email verification before watches become active (when Resend is configured)
+- Unsubscribe + re-opt-in via verify link
+- Rate limits (Redis-backed with Upstash)
 - Caps: 12 watches/email, 400 active watches total
-- Discord webhooks must be official Discord URLs
+- Durable notification cooldowns (Redis `SET NX`)
+- Store write lock to reduce Redis race conditions
+- Retention prune on each poll (old watches/notifications)
 - Security headers (CSP, frame deny, nosniff)
-- Production poll endpoint requires `CRON_SECRET`
+- Optional Sentry via `SENTRY_DSN`
+- Dependabot + GitHub Actions CI (`npm run ci`)
 
 ## CI
 
-GitHub Actions runs typecheck, unit tests, and production build on every push/PR (`npm run ci`).
+GitHub Actions runs typecheck, unit tests, and production build on every push/PR.
 
 ## Local storage
 
@@ -120,4 +136,4 @@ Without Upstash, watches are stored in `data/store.json` (fine for local / Railw
 
 ## Disclaimer
 
-Unofficial tool using public Planyo endpoints. Not affiliated with UMD RecWell.
+Unofficial community tool using public Planyo endpoints. Not affiliated with UMD, RecWell, or Planyo.
