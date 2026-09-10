@@ -22,9 +22,9 @@ interface Props {
 }
 
 export function WatchList({ watches, onCancel }: Props) {
-  const active = watches.filter((w) => w.status === "active");
+  const visible = watches.filter((w) => w.status === "active" || w.status === "pending");
 
-  if (active.length === 0) {
+  if (visible.length === 0) {
     return (
       <div className="glass rounded-2xl p-6 text-center text-white/50 text-sm">
         No active watches. Click &quot;Watch&quot; on any slot to get email alerts when it opens.
@@ -34,7 +34,7 @@ export function WatchList({ watches, onCancel }: Props) {
 
   return (
     <div className="space-y-2">
-      {active.map((w) => (
+      {visible.map((w) => (
         <div
           key={w.id}
           className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3"
@@ -44,6 +44,9 @@ export function WatchList({ watches, onCancel }: Props) {
               {w.label || `${formatDateShort(w.date)} · ${formatHour(w.hour)}`}
             </div>
             <div className="text-xs text-white/50 mt-0.5 flex flex-wrap gap-2">
+              {w.status === "pending" ? (
+                <span className="text-terp-gold">Pending email confirmation</span>
+              ) : null}
               {w.email ? <span>📧 {w.email}</span> : null}
               {w.notifyOnOpen ? <span>🔔 On open</span> : null}
               {w.notifyOnAvailable ? <span>✅ On available</span> : null}
@@ -66,7 +69,7 @@ interface WatchFormProps {
   date: string;
   hour: number;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (info?: { needsVerification?: boolean }) => void;
 }
 
 export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
@@ -119,10 +122,10 @@ export function WatchForm({ date, hour, onClose, onCreated }: WatchFormProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create watch");
 
-      if (email.trim()) localStorage.setItem("watchEmail", email.trim());
+      if (email.trim()) localStorage.setItem("watchEmail", email.trim().toLowerCase());
       if (browserNotify) localStorage.setItem("browserNotify", "true");
 
-      onCreated();
+      onCreated({ needsVerification: Boolean(data.needsVerification) });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");

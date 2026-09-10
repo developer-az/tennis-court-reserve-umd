@@ -1,4 +1,6 @@
+import { getAppUrl } from "./app-url";
 import { buildBookingLink, PLANYO } from "./constants";
+import { createEmailToken } from "./tokens";
 
 export async function sendDiscordWebhook(
   webhookUrl: string,
@@ -31,11 +33,41 @@ export function isEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
-export async function sendEmail(input: {
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function emailShell(opts: {
+  heading: string;
+  bodyHtml: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  footerHtml?: string;
+}): string {
+  return `
+    <div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;padding:24px;background:#151515;color:#fff;border-radius:12px;">
+      <h1 style="color:#FFD520;font-size:22px;margin:0 0 12px;">${escapeHtml(opts.heading)}</h1>
+      <div style="color:#ddd;font-size:16px;line-height:1.5;margin:0 0 20px;">${opts.bodyHtml}</div>
+      ${
+        opts.ctaUrl
+          ? `<a href="${escapeHtml(opts.ctaUrl)}" style="display:inline-block;background:#E03A3E;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">${escapeHtml(opts.ctaLabel ?? "Open")}</a>`
+          : ""
+      }
+      ${opts.footerHtml ?? ""}
+      <p style="color:#888;font-size:12px;margin-top:24px;">UMD Tennis Court Alerts · Eppley Recreation Center · Unofficial tool</p>
+    </div>
+  `;
+}
+
+async function resendSend(input: {
   to: string;
   subject: string;
   text: string;
-  bookingUrl?: string;
+  html: string;
 }): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -44,18 +76,6 @@ export async function sendEmail(input: {
   }
 
   const from = process.env.EMAIL_FROM ?? "UMD Tennis Alerts <onboarding@resend.dev>";
-  const html = `
-    <div style="font-family:Georgia,serif;max-width:520px;margin:0 auto;padding:24px;background:#151515;color:#fff;border-radius:12px;">
-      <h1 style="color:#FFD520;font-size:22px;margin:0 0 12px;">${escapeHtml(input.subject)}</h1>
-      <p style="color:#ddd;font-size:16px;line-height:1.5;margin:0 0 20px;">${escapeHtml(input.text)}</p>
-      ${
-        input.bookingUrl
-          ? `<a href="${escapeHtml(input.bookingUrl)}" style="display:inline-block;background:#E03A3E;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">Book court on Planyo</a>`
-          : ""
-      }
-      <p style="color:#888;font-size:12px;margin-top:24px;">UMD Tennis Court Alerts · Eppley Recreation Center</p>
-    </div>
-  `;
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -68,8 +88,8 @@ export async function sendEmail(input: {
         from,
         to: [input.to],
         subject: input.subject,
-        text: input.text + (input.bookingUrl ? `\n\nBook: ${input.bookingUrl}` : ""),
-        html,
+        text: input.text,
+        html: input.html,
       }),
     });
 
@@ -85,12 +105,52 @@ export async function sendEmail(input: {
   }
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+export function unsubscribeUrl(email: string): string {
+  const token = createEmailToken(email, "unsubscribe");
+  return `${getAppUrl()}/unsubscribe?token=${encodeURIComponent(token)}`;
+}
+
+export function verifyUrl(email: string): string {
+  const token = createEmailToken(email, "verify");
+  return `${getAppUrl()}/api/verify?token=${encodeURIComponent(token)}`;
+}
+
+export async function sendEmail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  bookingUrl?: string;
+}): Promise<boolean> {
+  const unsub = unsubscribeUrl(input.to);
+  const text =
+    input.text +
+    (input.bookingUrl ? `\n\nBook: ${input.bookingUrl}` : "") +
+    `\n\nUnsubscribe: ${unsub}`;
+
+  const html = emailShell({
+    heading: input.subject,
+    bodyHtml: `<p style="margin:0;">${escapeHtml(input.text)}</p>`,
+    ctaUrl: input.bookingUrl,
+    ctaLabel: "Book court on Planyo",
+    footerHtml: `<p style="color:#888;font-size:12px;margin-top:28px;"><a href="${escapeHtml(unsub)}" style="color:#888;">Unsubscribe from all alerts</a></p>`,
+  });
+
+  return resendSend({ to: input.to, subject: input.subject, text, html });
+}
+
+export async function sendVerificationEmail(email: string): Promise<boolean> {
+  const url = verifyUrl(email);
+  const unsub = unsubscribeUrl(email);
+  const subject = "Confirm your UMD Tennis Alerts email";
+  const text = `Confirm your email to activate court alerts:\n\n${url}\n\nIf you did not request this, you can ignore this message or unsubscribe:\n${unsub}`;
+  const html = emailShell({
+    heading: subject,
+    bodyHtml: `<p style="margin:0 0 12px;">Click below to verify this address and activate your court watches.</p><p style="margin:0;color:#aaa;font-size:13px;">Link expires in 48 hours.</p>`,
+    ctaUrl: url,
+    ctaLabel: "Verify email & activate",
+    footerHtml: `<p style="color:#888;font-size:12px;margin-top:28px;"><a href="${escapeHtml(unsub)}" style="color:#888;">Unsubscribe</a></p>`,
+  });
+  return resendSend({ to: email, subject, text, html });
 }
 
 export function formatHour(hour: number): string {

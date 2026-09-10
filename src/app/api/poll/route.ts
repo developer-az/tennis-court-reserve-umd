@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRecentNotifications, storageBackend } from "@/lib/db";
+import { reportError } from "@/lib/errors";
 import { isEmailConfigured } from "@/lib/notifications";
 import { runPoll } from "@/lib/poller";
 
@@ -10,12 +11,10 @@ function isProduction(): boolean {
 function authorize(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
-    // In production, refuse open poll endpoints (abuse / Planyo hammering).
     return !isProduction();
   }
   const auth = req.headers.get("authorization");
   if (auth === `Bearer ${secret}`) return true;
-  // Prefer Authorization header; query param kept for simple external cron tools.
   if (req.nextUrl.searchParams.get("secret") === secret) return true;
   return false;
 }
@@ -43,6 +42,7 @@ async function handlePoll(req: NextRequest) {
       emailConfigured: isEmailConfigured(),
     });
   } catch (err) {
+    await reportError(err, { where: "api/poll" });
     const message = err instanceof Error ? err.message : "Poll failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }

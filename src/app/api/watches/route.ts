@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cancelWatch, createWatch, getWatchesByEmail } from "@/lib/db";
+import { reportError } from "@/lib/errors";
 import { LIMITS } from "@/lib/limits";
+import { sendVerificationEmail } from "@/lib/notifications";
 import { PLANYO } from "@/lib/planyo";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import {
@@ -79,25 +81,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const watch = await createWatch({
+    const normalizedEmail = email ? normalizeEmail(String(email)) : undefined;
+    const { watch, needsVerification } = await createWatch({
       date: String(date),
       hour: h,
       label: sanitizeLabel(label),
-      email: email ? normalizeEmail(String(email)) : undefined,
+      email: normalizedEmail,
       discordWebhook: discordWebhook ? String(discordWebhook).trim() : undefined,
       notifyOnOpen,
       notifyOnAvailable,
     });
 
-    return NextResponse.json({ watch }, { status: 201, headers: rateLimitHeaders(rl) });
+    if (needsVerification && normalizedEmail) {
+      const sent = await sendVerificationEmail(normalizedEmail);
+      if (!sent) {
+        return NextResponse.json(
+          {
+            watch,
+            needsVerification: true,
+            warning: "Watch saved as pending, but verification email failed to send. Try again later.",
+          },
+          { status: 201, headers: rateLimitHeaders(rl) }
+        );
+      }
+    }
+
+    return NextResponse.json(
+      { watch, needsVerification },
+      { status: 201, headers: rateLimitHeaders(rl) }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create watch";
     if (message.includes("UNIQUE")) {
       return NextResponse.json({ error: "You already have an active watch for this slot" }, { status: 409 });
     }
-    if (message.includes("Limit of") || message.includes("at capacity")) {
+    if (message.includes("Limit of") || message.includes("at capacity") || message.includes("unsubscribed")) {
       return NextResponse.json({ error: message }, { status: 429 });
     }
+    await reportError(err, { where: "api/watches POST" });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
