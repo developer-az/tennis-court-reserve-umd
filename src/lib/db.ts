@@ -1,3 +1,5 @@
+import { LIMITS } from "./limits";
+
 export interface Watch {
   id: number;
   date: string;
@@ -123,6 +125,18 @@ export async function createWatch(input: {
 }): Promise<Watch> {
   const store = await readStore();
   const email = input.email?.trim().toLowerCase() || null;
+
+  const active = store.watches.filter((w) => w.status === "active");
+  if (active.length >= LIMITS.MAX_ACTIVE_WATCHES) {
+    throw new Error(`Service is at capacity (${LIMITS.MAX_ACTIVE_WATCHES} active watches). Try again later.`);
+  }
+  if (email) {
+    const forEmail = active.filter((w) => w.email === email).length;
+    if (forEmail >= LIMITS.MAX_WATCHES_PER_EMAIL) {
+      throw new Error(`Limit of ${LIMITS.MAX_WATCHES_PER_EMAIL} active watches per email reached`);
+    }
+  }
+
   const duplicate = store.watches.find(
     (w) =>
       w.status === "active" &&
@@ -172,10 +186,28 @@ export async function getAllWatches(): Promise<Watch[]> {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function cancelWatch(id: number): Promise<boolean> {
+export async function getWatchesByEmail(email: string): Promise<Watch[]> {
+  const normalized = email.trim().toLowerCase();
+  const store = await readStore();
+  return store.watches
+    .filter((w) => w.email === normalized)
+    .map(normalizeWatch)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function countActiveWatches(): Promise<number> {
+  const store = await readStore();
+  return store.watches.filter((w) => w.status === "active").length;
+}
+
+export async function cancelWatch(id: number, email?: string): Promise<boolean> {
   const store = await readStore();
   const watch = store.watches.find((w) => w.id === id && w.status === "active");
   if (!watch) return false;
+  if (email) {
+    const normalized = email.trim().toLowerCase();
+    if (watch.email !== normalized) return false;
+  }
   watch.status = "cancelled";
   await writeStore(store);
   return true;
@@ -221,17 +253,21 @@ export async function updateWatchAvailability(id: number, courtsAvailable: numbe
 }
 
 export async function getRecentNotifications(
-  limit = 50
+  limit = 50,
+  email?: string
 ): Promise<(Notification & { date: string; hour: number })[]> {
   const store = await readStore();
+  const normalized = email?.trim().toLowerCase();
   return store.notifications
     .slice()
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, limit)
     .map((n) => {
       const watch = store.watches.find((w) => w.id === n.watchId);
-      return { ...n, date: watch?.date ?? "", hour: watch?.hour ?? 0 };
-    });
+      return { ...n, date: watch?.date ?? "", hour: watch?.hour ?? 0, email: watch?.email ?? null };
+    })
+    .filter((n) => (normalized ? n.email === normalized : true))
+    .slice(0, limit)
+    .map(({ email: _email, ...rest }) => rest);
 }
 
 export function storageBackend(): "redis" | "json" {

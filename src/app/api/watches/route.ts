@@ -1,21 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cancelWatch, createWatch, getAllWatches } from "@/lib/db";
+import { cancelWatch, createWatch, getWatchesByEmail } from "@/lib/db";
+import { LIMITS } from "@/lib/limits";
 import { PLANYO } from "@/lib/planyo";
+import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import {
+  isValidDiscordWebhook,
+  isValidEmail,
+  isValidHour,
+  isWatchDateAllowed,
+  normalizeEmail,
+  sanitizeLabel,
+} from "@/lib/validate";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export async function GET(req: NextRequest) {
+  const ip = clientIp(req);
+  const rl = await rateLimit(`watches:get:${ip}`, LIMITS.RATE.WATCHES_READ);
+  if (!rl.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rl) });
+  }
 
-export async function GET() {
-  const watches = await getAllWatches();
-  return NextResponse.json({ watches });
+  const email = req.nextUrl.searchParams.get("email");
+  if (!email || !isValidEmail(email)) {
+    return NextResponse.json(
+      { error: "email query parameter is required" },
+      { status: 400, headers: rateLimitHeaders(rl) }
+    );
+  }
+
+  const watches = await getWatchesByEmail(normalizeEmail(email));
+  return NextResponse.json({ watches }, { headers: rateLimitHeaders(rl) });
 }
 
 export async function POST(req: NextRequest) {
+  const ip = clientIp(req);
+  const rl = await rateLimit(`watches:post:${ip}`, LIMITS.RATE.WATCHES_WRITE);
+  if (!rl.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rl) });
+  }
+
   try {
     const body = await req.json();
     const { date, hour, label, email, discordWebhook, notifyOnOpen, notifyOnAvailable } = body;
 
     if (!date || hour === undefined) {
       return NextResponse.json({ error: "date and hour are required" }, { status: 400 });
+    }
+
+    if (!isWatchDateAllowed(String(date))) {
+      return NextResponse.json(
+        { error: `date must be a valid day within the next ${LIMITS.MAX_WATCH_AHEAD_DAYS} days` },
+        { status: 400 }
+      );
     }
 
     if (!email && !discordWebhook) {
@@ -25,12 +60,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (email && !EMAIL_RE.test(String(email))) {
+    if (email && !isValidEmail(String(email))) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
+    if (discordWebhook && !isValidDiscordWebhook(String(discordWebhook))) {
+      return NextResponse.json(
+        { error: "Discord webhook must be a discord.com/api/webhooks/... URL" },
+        { status: 400 }
+      );
+    }
+
     const h = Number(hour);
-    if (h < PLANYO.FIRST_HOUR || h >= PLANYO.LAST_HOUR) {
+    if (!isValidHour(h)) {
       return NextResponse.json(
         { error: `Hour must be between ${PLANYO.FIRST_HOUR} and ${PLANYO.LAST_HOUR - 1}` },
         { status: 400 }
@@ -38,29 +80,43 @@ export async function POST(req: NextRequest) {
     }
 
     const watch = await createWatch({
-      date,
+      date: String(date),
       hour: h,
-      label,
-      email: email || undefined,
-      discordWebhook: discordWebhook || undefined,
+      label: sanitizeLabel(label),
+      email: email ? normalizeEmail(String(email)) : undefined,
+      discordWebhook: discordWebhook ? String(discordWebhook).trim() : undefined,
       notifyOnOpen,
       notifyOnAvailable,
     });
 
-    return NextResponse.json({ watch }, { status: 201 });
+    return NextResponse.json({ watch }, { status: 201, headers: rateLimitHeaders(rl) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create watch";
     if (message.includes("UNIQUE")) {
       return NextResponse.json({ error: "You already have an active watch for this slot" }, { status: 409 });
+    }
+    if (message.includes("Limit of") || message.includes("at capacity")) {
+      return NextResponse.json({ error: message }, { status: 429 });
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  const ip = clientIp(req);
+  const rl = await rateLimit(`watches:delete:${ip}`, LIMITS.RATE.WATCHES_WRITE);
+  if (!rl.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: rateLimitHeaders(rl) });
+  }
+
   const id = req.nextUrl.searchParams.get("id");
+  const email = req.nextUrl.searchParams.get("email");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-  const ok = await cancelWatch(Number(id));
+  if (!email || !isValidEmail(email)) {
+    return NextResponse.json({ error: "email required to cancel a watch" }, { status: 400 });
+  }
+
+  const ok = await cancelWatch(Number(id), normalizeEmail(email));
   if (!ok) return NextResponse.json({ error: "Watch not found" }, { status: 404 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true }, { headers: rateLimitHeaders(rl) });
 }
