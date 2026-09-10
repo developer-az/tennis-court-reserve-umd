@@ -81,14 +81,23 @@ export async function fetchMonthData(year: number, month: number): Promise<Month
   if (!res.ok) throw new Error(`Planyo fetch-data failed: ${res.status}`);
   const data = (await res.json()) as PlanyoFetchResponse;
 
+  // Planyo returns res_usage as day → hour → resourceId → bookedCount
+  // (older payloads sometimes used day → hour → count).
   const resUsage: Record<string, Record<string, number>> = {};
   const rawUsage = data.res_usage ?? {};
   for (const [day, dayData] of Object.entries(rawUsage)) {
     if (day === "md" || day === "pd") continue;
     resUsage[day] = {};
     for (const [key, val] of Object.entries(dayData)) {
+      if (key === "md" || key === "pd") continue;
       if (typeof val === "number") {
         resUsage[day][key] = val;
+      } else if (val && typeof val === "object") {
+        const nested = val as Record<string, number>;
+        const count = nested[PLANYO.RESOURCE_ID] ?? Object.values(nested)[0];
+        if (typeof count === "number") {
+          resUsage[day][key] = count;
+        }
       }
     }
   }
@@ -174,9 +183,10 @@ export async function getDaySlots(date: string, now = new Date()): Promise<SlotA
     const slotStart = parseSlotDateTime(date, hour);
     if (slotStart <= now) continue;
 
-    const booked = dayUsage[String(hour)] ?? dayUsage[PLANYO.RESOURCE_ID] ?? 0;
+    const booked = dayUsage[String(hour)] ?? 0;
     const vacationBlocked = getVacationBlocked(dayVacations, hour);
-    const blocked = Math.max(booked, vacationBlocked);
+    // Bookings and vacation blocks are separate; both reduce available courts.
+    const blocked = booked + vacationBlocked;
     const courtsAvailable = Math.max(0, PLANYO.COURT_COUNT - blocked);
     const opensAt = getOpensAt(slotStart);
     const isOpen = isSlotOpenForBooking(slotStart, now);
