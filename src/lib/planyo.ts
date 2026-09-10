@@ -81,10 +81,19 @@ export async function fetchMonthData(year: number, month: number): Promise<Month
   if (!res.ok) throw new Error(`Planyo fetch-data failed: ${res.status}`);
   const data = (await res.json()) as PlanyoFetchResponse;
 
-  // Planyo returns res_usage as day → hour → resourceId → bookedCount
-  // (older payloads sometimes used day → hour → count).
+  return {
+    year,
+    month,
+    resUsage: parseResUsage(data.res_usage ?? {}),
+    vacations: data.vacations ?? {},
+  };
+}
+
+/** Normalize Planyo res_usage (supports nested resourceId maps and flat counts). */
+export function parseResUsage(
+  rawUsage: Record<string, Record<string, number | Record<string, number>>>
+): Record<string, Record<string, number>> {
   const resUsage: Record<string, Record<string, number>> = {};
-  const rawUsage = data.res_usage ?? {};
   for (const [day, dayData] of Object.entries(rawUsage)) {
     if (day === "md" || day === "pd") continue;
     resUsage[day] = {};
@@ -101,13 +110,7 @@ export async function fetchMonthData(year: number, month: number): Promise<Month
       }
     }
   }
-
-  return {
-    year,
-    month,
-    resUsage,
-    vacations: data.vacations ?? {},
-  };
+  return resUsage;
 }
 
 export async function searchSlot(date: string, hour: number): Promise<{

@@ -1,4 +1,5 @@
 import { addNotification, getActiveWatches, markWatchTriggered, updateWatchAvailability } from "./db";
+import { LIMITS } from "./limits";
 import {
   buildAvailableNotification,
   buildOpenNotification,
@@ -9,6 +10,7 @@ import { getOpensAt, isSlotOpenForBooking, parseSlotDateTime, searchSlot } from 
 export interface PollResult {
   checked: number;
   triggered: number;
+  skipped: number;
   events: Array<{
     watchId: number;
     type: string;
@@ -34,7 +36,11 @@ function shouldNotify(watchId: number, type: string): boolean {
 
 export async function runPoll(now = new Date()): Promise<PollResult> {
   const watches = await getActiveWatches();
-  const result: PollResult = { checked: watches.length, triggered: 0, events: [] };
+  const result: PollResult = { checked: 0, triggered: 0, skipped: 0, events: [] };
+
+  // Deduplicate Planyo lookups across watches on the same slot.
+  const slotCache = new Map<string, Awaited<ReturnType<typeof searchSlot>>>();
+  let lookups = 0;
 
   for (const watch of watches) {
     const slotStart = parseSlotDateTime(watch.date, watch.hour);
@@ -43,9 +49,22 @@ export async function runPoll(now = new Date()): Promise<PollResult> {
       continue;
     }
 
+    const slotKey = `${watch.date}:${watch.hour}`;
+    let search = slotCache.get(slotKey);
+    if (!search) {
+      if (lookups >= LIMITS.MAX_POLL_SLOT_LOOKUPS) {
+        result.skipped++;
+        continue;
+      }
+      search = await searchSlot(watch.date, watch.hour);
+      slotCache.set(slotKey, search);
+      lookups++;
+    }
+
+    result.checked++;
     const opensAt = getOpensAt(slotStart);
     const isOpen = isSlotOpenForBooking(slotStart, now);
-    const { available, courtsAvailable, reason } = await searchSlot(watch.date, watch.hour);
+    const { available, courtsAvailable, reason } = search;
 
     if (watch.notifyOnOpen && isOpen && now >= opensAt) {
       const msSinceOpen = now.getTime() - opensAt.getTime();

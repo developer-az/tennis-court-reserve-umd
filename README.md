@@ -95,10 +95,24 @@ A Friday 4 PM slot opens for booking Wednesday 4 PM.
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/availability?days=3` | GET | Upcoming slot availability |
-| `/api/watches` | GET/POST/DELETE | Manage watches |
-| `/api/notifications` | GET | Recent alerts |
-| `/api/poll` | GET/POST | Run checks (protect with `CRON_SECRET`) |
+| `/api/watches?email=` | GET/POST/DELETE | Manage watches (scoped by email) |
+| `/api/notifications?email=` | GET | Your recent alerts |
+| `/api/poll` | GET/POST | Run checks (requires `CRON_SECRET` in production) |
 | `/api/slot?date=...&hour=...` | GET | Live Planyo slot search |
+
+## Safeguards (multi-user)
+
+- Watches and notifications are **email-scoped** (no public dump of all users)
+- Cancel requires matching email
+- Rate limits on API routes (Redis-backed when Upstash is configured)
+- Caps: 12 watches/email, 400 active watches total
+- Discord webhooks must be official Discord URLs
+- Security headers (CSP, frame deny, nosniff)
+- Production poll endpoint requires `CRON_SECRET`
+
+## CI
+
+GitHub Actions runs typecheck, unit tests, and production build on every push/PR (`npm run ci`).
 
 ## Local storage
 

@@ -3,18 +3,34 @@ import { getRecentNotifications, storageBackend } from "@/lib/db";
 import { isEmailConfigured } from "@/lib/notifications";
 import { runPoll } from "@/lib/poller";
 
+function isProduction(): boolean {
+  return process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
+}
+
 function authorize(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) {
+    // In production, refuse open poll endpoints (abuse / Planyo hammering).
+    return !isProduction();
+  }
   const auth = req.headers.get("authorization");
   if (auth === `Bearer ${secret}`) return true;
+  // Prefer Authorization header; query param kept for simple external cron tools.
   if (req.nextUrl.searchParams.get("secret") === secret) return true;
   return false;
 }
 
 async function handlePoll(req: NextRequest) {
   if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      {
+        error: "Unauthorized",
+        hint: isProduction() && !process.env.CRON_SECRET
+          ? "Set CRON_SECRET in Vercel env vars"
+          : undefined,
+      },
+      { status: 401 }
+    );
   }
 
   try {

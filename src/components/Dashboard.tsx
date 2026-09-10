@@ -39,8 +39,17 @@ export default function Dashboard() {
   }, []);
 
   const fetchWatches = useCallback(async () => {
-    const res = await fetch("/api/watches");
+    const email = typeof window !== "undefined" ? localStorage.getItem("watchEmail") : null;
+    if (!email) {
+      setWatches([]);
+      return;
+    }
+    const res = await fetch(`/api/watches?email=${encodeURIComponent(email)}`);
     const data = await res.json();
+    if (!res.ok) {
+      setWatches([]);
+      return;
+    }
     setWatches(data.watches ?? []);
   }, []);
 
@@ -64,7 +73,12 @@ export default function Dashboard() {
   }, []);
 
   const refreshNotifications = useCallback(async () => {
-    const res = await fetch("/api/notifications");
+    const email = typeof window !== "undefined" ? localStorage.getItem("watchEmail") : null;
+    if (!email) {
+      setNotifications([]);
+      return;
+    }
+    const res = await fetch(`/api/notifications?email=${encodeURIComponent(email)}`);
     const data = await res.json();
     if (res.ok) {
       const notifs = data.notifications ?? [];
@@ -124,7 +138,9 @@ export default function Dashboard() {
   }, [fetchAvailability]);
 
   async function handleCancelWatch(id: number) {
-    await fetch(`/api/watches?id=${id}`, { method: "DELETE" });
+    const email = localStorage.getItem("watchEmail");
+    if (!email) return;
+    await fetch(`/api/watches?id=${id}&email=${encodeURIComponent(email)}`, { method: "DELETE" });
     fetchWatches();
   }
 
@@ -180,7 +196,7 @@ export default function Dashboard() {
             <div className="text-3xl font-bold text-terp-gold">
               {watches.filter((w) => w.status === "active").length}
             </div>
-            <div className="text-sm text-white/60">Active watches</div>
+            <div className="text-sm text-white/60">Your active watches</div>
           </div>
         </section>
 
