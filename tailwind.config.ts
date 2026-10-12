@@ -5,6 +5,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        ink: "#1A1612",
         terp: {
           red: "#E03A3E",
           gold: "#FFD520",
@@ -13,15 +14,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: [
-          "system-ui",
-          "-apple-system",
-          "Segoe UI",
-          "Roboto",
-          "Helvetica",
-          "Arial",
-          "sans-serif",
-        ],
+        display: ["var(--font-display)", "Impact", "sans-serif"],
+        sans: ["var(--font-sans)", "system-ui", "Segoe UI", "sans-serif"],
       },
     },
   },
