@@ -28,31 +28,33 @@ export default async function UnsubscribePage({
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
-      <div className="glass rounded-2xl max-w-md w-full p-8 space-y-4 text-center">
-        <h1 className="font-display text-2xl text-terp-gold">Unsubscribe</h1>
+    <main className="flex min-h-screen items-center justify-center bg-neutral-100 px-4 py-16">
+      <div className="panel w-full max-w-md p-6 text-center shadow-sm">
+        <h1 className="text-xl font-semibold">Unsubscribe</h1>
+
         {state === "ok" && (
           <>
-            <p className="text-white/80 text-sm">
-              Unsubscribed <strong className="text-white">{email}</strong> and cancelled{" "}
-              {cancelled} watch{cancelled === 1 ? "" : "es"}.
+            <p className="mt-3 text-sm text-neutral-600">
+              Removed <strong>{email}</strong> and cancelled {cancelled} watch
+              {cancelled === 1 ? "" : "es"}.
             </p>
-            <p className="text-white/50 text-xs">
-              To receive alerts again later, create a new watch and confirm the verification email.
+            <p className="mt-2 text-xs text-neutral-500">
+              To opt back in later, create a watch and confirm the verification email.
             </p>
           </>
         )}
         {state === "invalid" && (
-          <p className="text-red-300 text-sm">This unsubscribe link is invalid or expired.</p>
+          <p className="mt-3 text-sm text-red-600">This unsubscribe link is invalid or expired.</p>
         )}
         {state === "missing" && (
-          <p className="text-white/60 text-sm">Open the unsubscribe link from your alert email.</p>
+          <p className="mt-3 text-sm text-neutral-600">Open the unsubscribe link from your alert email.</p>
         )}
         {state === "error" && (
-          <p className="text-red-300 text-sm">Something went wrong. Try again later.</p>
+          <p className="mt-3 text-sm text-red-600">Something went wrong. Try again later.</p>
         )}
-        <a href="/" className="inline-block text-sm text-terp-gold hover:underline">
-          ← Back to Tennis Alerts
+
+        <a href="/" className="btn-secondary mt-6 inline-flex">
+          Back to alerts
         </a>
       </div>
     </main>
