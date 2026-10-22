@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { formatDate, formatHour, formatOpensAt, timeUntil } from "@/lib/format";
 import { buildBookingLink } from "@/lib/constants";
 
@@ -38,120 +37,92 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch }: Props) {
 
   if (slots.length === 0) {
     return (
-      <div className="glass rounded-2xl p-8 text-center text-white/60">
+      <div className="panel px-6 py-10 text-center text-sm text-neutral-500">
         No upcoming slots found. Courts book up to 48 hours ahead.
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {dates.map((date) => (
-        <div key={date} className="glass rounded-2xl overflow-hidden">
-          <div className="bg-terp-red/20 px-5 py-3 border-b border-white/10">
-            <h3 className="font-display text-lg font-semibold text-terp-gold">{formatDate(date)}</h3>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 p-4">
+        <section key={date} className="panel overflow-hidden">
+          <header className="border-b border-neutral-200 bg-terp-red px-4 py-2.5">
+            <h3 className="text-base font-semibold text-white">{formatDate(date)}</h3>
+          </header>
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {grouped[date]
+              .slice()
               .sort((a, b) => a.hour - b.hour)
               .map((slot) => {
                 const key = slotKey(slot.date, slot.hour);
                 const watched = watchedSlots.has(key);
-                const full = slot.courtsAvailable === 0;
+                const full = slot.courtsAvailable === 0 && slot.isOpen;
                 const openingSoon = !slot.isOpen;
                 const bookable = slot.isBookable;
+                const bookingUrl = buildBookingLink(slot.date, slot.hour);
+
+                let boxClass = "border-neutral-200 bg-neutral-50";
+                if (bookable) boxClass = "border-green-300 bg-green-50";
+                else if (full) boxClass = "border-red-200 bg-red-50";
+                else if (openingSoon) boxClass = "border-amber-200 bg-amber-50";
 
                 return (
-                  <SlotCard
-                    key={key}
-                    slot={slot}
-                    watched={watched}
-                    full={full}
-                    openingSoon={openingSoon}
-                    bookable={bookable}
-                    onWatch={() => onWatch(slot.date, slot.hour)}
-                  />
+                  <div key={key} className={`rounded-md border p-2.5 ${boxClass}`}>
+                    <div className="text-sm font-semibold text-neutral-900">{formatHour(slot.hour)}</div>
+                    <div className="mt-0.5 text-xs">
+                      {bookable ? (
+                        <span className="font-medium text-green-700">
+                          {slot.courtsAvailable}/{slot.courtsTotal} open
+                        </span>
+                      ) : full ? (
+                        <span className="font-medium text-red-700">Full</span>
+                      ) : openingSoon ? (
+                        <span className="text-amber-800" title={formatOpensAt(slot.opensAt)}>
+                          Opens {timeUntil(slot.opensAt)}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-500">
+                          {slot.courtsAvailable}/{slot.courtsTotal}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex gap-1">
+                      {bookable && (
+                        <a
+                          href={bookingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-primary flex-1 !px-1.5 !py-1 text-xs"
+                        >
+                          Book
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onWatch(slot.date, slot.hour)}
+                        disabled={watched}
+                        className={`flex-1 !px-1.5 !py-1 text-xs ${
+                          watched
+                            ? "btn border border-terp-gold bg-terp-gold/20 text-neutral-800"
+                            : "btn-secondary"
+                        }`}
+                        title={
+                          openingSoon
+                            ? `Notify when booking opens at ${formatOpensAt(slot.opensAt)}`
+                            : "Notify on availability"
+                        }
+                      >
+                        {watched ? "Watching" : "Watch"}
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
           </div>
-        </div>
+        </section>
       ))}
-    </div>
-  );
-}
-
-function SlotCard({
-  slot,
-  watched,
-  full,
-  openingSoon,
-  bookable,
-  onWatch,
-}: {
-  slot: Slot;
-  watched: boolean;
-  full: boolean;
-  openingSoon: boolean;
-  bookable: boolean;
-  onWatch: () => void;
-}) {
-  const [hover, setHover] = useState(false);
-  const bookingUrl = buildBookingLink(slot.date, slot.hour);
-
-  let statusClass = "border-white/10 bg-white/5";
-  if (bookable) statusClass = "border-green-500/40 bg-green-500/10";
-  else if (full && slot.isOpen) statusClass = "border-red-500/30 bg-red-500/10";
-  else if (openingSoon) statusClass = "border-terp-gold/30 bg-terp-gold/5";
-
-  return (
-    <div
-      className={`relative rounded-xl border p-3 transition-all ${statusClass} ${bookable ? "hover:scale-[1.02]" : ""}`}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
-      <div className="text-sm font-semibold">{formatHour(slot.hour)}</div>
-      <div className="mt-1 text-xs text-white/70">
-        {bookable ? (
-          <span className="text-green-400">{slot.courtsAvailable}/{slot.courtsTotal} open</span>
-        ) : full && slot.isOpen ? (
-          <span className="text-red-400">Full</span>
-        ) : openingSoon ? (
-          <span className="text-terp-gold">Opens {timeUntil(slot.opensAt)}</span>
-        ) : (
-          <span>{slot.courtsAvailable}/{slot.courtsTotal}</span>
-        )}
-      </div>
-
-      <div className="mt-2 flex gap-1">
-        {bookable && (
-          <a
-            href={bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 rounded-lg bg-terp-red px-2 py-1 text-center text-xs font-medium hover:bg-terp-red/80"
-          >
-            Book
-          </a>
-        )}
-        <button
-          onClick={onWatch}
-          disabled={watched}
-          className={`flex-1 rounded-lg px-2 py-1 text-xs font-medium transition ${
-            watched
-              ? "bg-terp-gold/20 text-terp-gold cursor-default"
-              : "bg-white/10 hover:bg-terp-gold/20 hover:text-terp-gold"
-          }`}
-          title={openingSoon ? `Notify when booking opens at ${formatOpensAt(slot.opensAt)}` : "Notify on availability"}
-        >
-          {watched ? "Watching" : "Watch"}
-        </button>
-      </div>
-
-      {hover && openingSoon && (
-        <div className="absolute -top-1 left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-black/90 px-2 py-1 text-xs whitespace-nowrap border border-white/10">
-          Opens {formatOpensAt(slot.opensAt)}
-        </div>
-      )}
     </div>
   );
 }
