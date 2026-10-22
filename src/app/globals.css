@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
 
 :root {
   --terp-red: #e03a3e;
@@ -19,22 +18,25 @@ body {
     @apply rounded-lg border border-neutral-200 bg-white;
   }
 
-  .btn {
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost {
     @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition
       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terp-red
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn bg-terp-red text-white hover:bg-[#c83236];
+    @apply bg-terp-red text-white hover:bg-[#c83236];
   }
 
   .btn-secondary {
-    @apply btn border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50;
+    @apply border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50;
   }
 
   .btn-ghost {
-    @apply btn text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800;
+    @apply text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800;
   }
 
   .field {
