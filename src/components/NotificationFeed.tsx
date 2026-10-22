@@ -16,33 +16,38 @@ interface Props {
   notifications: Notification[];
 }
 
+function typeLabel(type: string) {
+  if (type === "slot_opened") return "Opened";
+  if (type === "court_available") return "Available";
+  return "Update";
+}
+
 export function NotificationFeed({ notifications }: Props) {
   if (notifications.length === 0) {
     return (
-      <div className="glass rounded-2xl p-6 text-center text-white/50 text-sm">
-        No notifications yet. Alerts will appear here when watched slots open.
+      <div className="panel px-4 py-6 text-center text-sm text-neutral-500">
+        No notifications yet. Alerts appear here when watched slots open.
       </div>
     );
   }
 
   return (
-    <div className="space-y-2 max-h-64 overflow-y-auto">
+    <ul className="panel max-h-72 divide-y divide-neutral-200 overflow-y-auto">
       {notifications.map((n) => (
-        <div key={n.id} className="glass rounded-xl px-4 py-3 text-sm">
-          <div className="flex items-start gap-2">
-            <span className="text-lg leading-none">
-              {n.type === "slot_opened" ? "🔔" : n.type === "court_available" ? "✅" : "ℹ️"}
+        <li key={n.id} className="px-3 py-3">
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
+            <span className="font-medium text-neutral-700">{typeLabel(n.type)}</span>
+            <span>·</span>
+            <span>
+              {formatDateShort(n.date)} {formatHour(n.hour)}
             </span>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-white/90">{n.message}</div>
-              <div className="text-xs text-white/40 mt-1">
-                {formatDateShort(n.date)} · {formatHour(n.hour)} ·{" "}
-                {new Date(n.createdAt + "Z").toLocaleTimeString()}
-              </div>
-            </div>
           </div>
-        </div>
+          <p className="mt-1 text-sm text-neutral-800">{n.message}</p>
+          <p className="mt-1 text-xs text-neutral-400">
+            {new Date(n.createdAt.endsWith("Z") ? n.createdAt : `${n.createdAt}Z`).toLocaleString()}
+          </p>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
