@@ -8,13 +8,20 @@ const config: Config = {
         terp: {
           red: "#E03A3E",
           gold: "#FFD520",
-          black: "#151515",
+          black: "#1A1A1A",
           gray: "#707372",
         },
       },
       fontFamily: {
-        display: ["Georgia", "serif"],
-        sans: ["system-ui", "Segoe UI", "sans-serif"],
+        sans: [
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica",
+          "Arial",
+          "sans-serif",
+        ],
       },
     },
   },
