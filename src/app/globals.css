@@ -5,24 +5,44 @@
 :root {
   --terp-red: #e03a3e;
   --terp-gold: #ffd520;
-  --terp-black: #151515;
+  --terp-black: #1a1a1a;
 }
 
 body {
-  background: linear-gradient(160deg, #0d0d0d 0%, #1a1a1a 40%, #151515 100%);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f5f5f5;
+  color: #1a1a1a;
 }
 
-@layer utilities {
-  .glass {
-    @apply bg-white/5 backdrop-blur-md border border-white/10;
+@layer components {
+  .panel {
+    @apply rounded-lg border border-neutral-200 bg-white;
   }
-}
 
-@keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 213, 32, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(255, 213, 32, 0); }
-}
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terp-red
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
 
-.pulse-gold {
-  animation: pulse-gold 2s ease-in-out infinite;
+  .btn-primary {
+    @apply btn bg-terp-red text-white hover:bg-[#c83236];
+  }
+
+  .btn-secondary {
+    @apply btn border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50;
+  }
+
+  .btn-ghost {
+    @apply btn text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800;
+  }
+
+  .field {
+    @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm
+      outline-none placeholder:text-neutral-400 focus:border-terp-red focus:ring-1 focus:ring-terp-red;
+  }
+
+  .label {
+    @apply mb-1 block text-sm font-medium text-neutral-700;
+  }
 }
