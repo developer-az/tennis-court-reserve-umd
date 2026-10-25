@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseResUsage } from "./planyo";
+import { formatDateTime, getOpensAt, isSlotOpenForBooking, parseResUsage, parseSlotDateTime } from "./planyo";
 import { PLANYO } from "./constants";
 import {
   isValidDiscordWebhook,
@@ -32,6 +32,33 @@ describe("parseResUsage", () => {
   });
 });
 
+describe("Eastern booking window", () => {
+  it("formats Planyo timestamps in Eastern time, not UTC", () => {
+    const winter = parseSlotDateTime("2026-01-16", 16);
+    assert.equal(winter.toISOString(), "2026-01-16T21:00:00.000Z");
+    assert.equal(formatDateTime(winter), "2026-01-16 16:00:00");
+
+    const summer = parseSlotDateTime("2026-07-17", 16);
+    assert.equal(summer.toISOString(), "2026-07-17T20:00:00.000Z");
+    assert.equal(formatDateTime(summer), "2026-07-17 16:00:00");
+  });
+
+  it("opens a Friday 4 PM slot at Wednesday 4 PM Eastern, including across DST", () => {
+    const friday = parseSlotDateTime("2026-10-30", 16);
+    const opens = getOpensAt(friday);
+    assert.equal(opens.toISOString(), "2026-10-28T20:00:00.000Z");
+    assert.equal(isSlotOpenForBooking(friday, new Date("2026-10-28T19:59:00.000Z")), false);
+    assert.equal(isSlotOpenForBooking(friday, new Date("2026-10-28T20:00:00.000Z")), true);
+    assert.equal(isSlotOpenForBooking(friday, friday), false);
+
+    const afterSpringForward = parseSlotDateTime("2026-03-09", 16);
+    assert.equal(getOpensAt(afterSpringForward).toISOString(), "2026-03-07T21:00:00.000Z");
+
+    const afterFallBack = parseSlotDateTime("2026-11-02", 16);
+    assert.equal(getOpensAt(afterFallBack).toISOString(), "2026-10-31T20:00:00.000Z");
+  });
+});
+
 describe("validate", () => {
   it("accepts normal emails and rejects junk", () => {
     assert.equal(isValidEmail("you@terpmail.umd.edu"), true);
@@ -53,5 +80,11 @@ describe("validate", () => {
     assert.equal(isWatchDateAllowed("2026-09-11", now), true);
     assert.equal(isWatchDateAllowed("2026-10-01", now), false);
     assert.equal(isWatchDateAllowed("2026-09-09", now), false);
+  });
+
+  it("uses the Eastern calendar date when UTC has already rolled over", () => {
+    const now = new Date("2026-10-26T00:30:00.000Z");
+    assert.equal(isWatchDateAllowed("2026-10-25", now), true);
+    assert.equal(isWatchDateAllowed("2026-10-24", now), false);
   });
 });

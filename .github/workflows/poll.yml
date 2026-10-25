@@ -1,0 +1,43 @@
+name: Poll
+
+on:
+  schedule:
+    # Fastest interval GitHub Actions allows. Vercel Hobby crons only run once a day.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: none
+
+concurrency:
+  group: court-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    name: Check Planyo watches
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: POST /api/poll
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL}" ] || [ -z "${CRON_SECRET}" ]; then
+            echo "::warning::Add repository secrets APP_URL and CRON_SECRET (same values as Vercel). Until then, only the daily Vercel cron runs and slot-open alerts stay late."
+            exit 0
+          fi
+          tmp="$(mktemp)"
+          code="$(curl --silent --show-error --max-time 50 --output "$tmp" --write-out "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Accept: application/json" \
+            "${APP_URL%/}/api/poll")"
+          echo "HTTP ${code}"
+          cat "$tmp"
+          echo
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            exit 1
+          fi

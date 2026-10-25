@@ -1,25 +1,5 @@
 import { LIMITS } from "./limits";
-
-function redisConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-}
-
-async function redisCommand<T>(...args: (string | number)[]): Promise<T> {
-  const url = process.env.UPSTASH_REDIS_REST_URL!;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN!;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Redis error: ${res.status}`);
-  const data = (await res.json()) as { result: T };
-  return data.result;
-}
+import { redisCommand, redisConfigured } from "./redis";
 
 const memoryCooldowns = new Map<string, number>();
 

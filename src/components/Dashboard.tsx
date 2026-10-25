@@ -1,68 +1,88 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AvailabilityGrid, type Slot } from "./AvailabilityGrid";
 import { NotificationFeed } from "./NotificationFeed";
 import { WatchForm, WatchList, type Watch } from "./WatchList";
-import { buildBookingLink, PLANYO } from "@/lib/constants";
+import { PLANYO, buildBookingLink } from "@/lib/constants";
+import { formatDate, formatDateShort, formatHour, formatOpensAt, timeUntil } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 30_000;
 
 type HealthStatus = "ok" | "degraded" | "down" | "unknown";
+type SlotFilter = "all" | "open" | "full" | "soon";
+type BannerTone = "ok" | "warn" | "error";
 
-function storedEmail() {
+interface AlertItem {
+  id: number;
+  type: string;
+  message: string;
+  courtsAvailable: number | null;
+  createdAt: string;
+  date: string;
+  hour: number;
+}
+
+function storedEmail(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("watchEmail");
+}
+
+async function readJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 export default function Dashboard() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [watches, setWatches] = useState<Watch[]>([]);
-  const [notifications, setNotifications] = useState<
-    Array<{
-      id: number;
-      type: string;
-      message: string;
-      courtsAvailable: number | null;
-      createdAt: string;
-      date: string;
-      hour: number;
-    }>
-  >([]);
+  const [notifications, setNotifications] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
+  const [bannerTone, setBannerTone] = useState<BannerTone>("ok");
   const [watchTarget, setWatchTarget] = useState<{ date: string; hour: number } | null>(null);
   const [lastPoll, setLastPoll] = useState<Date | null>(null);
   const [health, setHealth] = useState<{ status: HealthStatus; lastPollAt: string | null }>({
     status: "unknown",
     lastPollAt: null,
   });
-  const [polling, setPolling] = useState(false);
+  const [days, setDays] = useState(3);
+  const [filter, setFilter] = useState<SlotFilter>("all");
   const knownNotifIds = useRef(new Set<number>());
+  const seededFor = useRef<string | null>(null);
 
-  const watchedSlots = new Set(
-    watches
-      .filter((w) => w.status === "active" || w.status === "pending")
-      .map((w) => `${w.date}:${w.hour}`)
+  const watchedSlots = useMemo(
+    () =>
+      new Set(
+        watches
+          .filter((watch) => watch.status === "active" || watch.status === "pending")
+          .map((watch) => `${watch.date}:${watch.hour}`)
+      ),
+    [watches]
   );
 
   const fetchAvailability = useCallback(async () => {
-    const res = await fetch("/api/availability?days=3");
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    setSlots(data.slots);
-  }, []);
+    const res = await fetch(`/api/availability?days=${days}`);
+    const data = await readJson(res);
+    if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to load courts");
+    setSlots(Array.isArray(data.slots) ? (data.slots as Slot[]) : []);
+  }, [days]);
 
   const fetchHealth = useCallback(async () => {
     try {
       const res = await fetch("/api/health");
-      const data = await res.json();
+      const data = await readJson(res);
+      const status = (data.status as HealthStatus) ?? "unknown";
       setHealth({
-        status: (data.status as HealthStatus) ?? "unknown",
-        lastPollAt: data.lastPollAt ?? null,
+        status,
+        lastPollAt: typeof data.lastPollAt === "string" ? data.lastPollAt : null,
       });
-      if (data.lastPollAt) setLastPoll(new Date(data.lastPollAt));
+      if (typeof data.lastPollAt === "string") setLastPoll(new Date(data.lastPollAt));
     } catch {
       setHealth({ status: "unknown", lastPollAt: null });
     }
@@ -75,22 +95,28 @@ export default function Dashboard() {
       return;
     }
     const res = await fetch(`/api/watches?email=${encodeURIComponent(email)}`);
-    const data = await res.json();
-    setWatches(res.ok ? (data.watches ?? []) : []);
+    const data = await readJson(res);
+    setWatches(res.ok && Array.isArray(data.watches) ? (data.watches as Watch[]) : []);
   }, []);
 
-  const showBrowserAlerts = useCallback((notifs: typeof notifications) => {
+  const showBrowserAlerts = useCallback((notifs: AlertItem[], email: string) => {
+    if (seededFor.current !== email) {
+      seededFor.current = email;
+      knownNotifIds.current = new Set(notifs.map((item) => item.id));
+      return;
+    }
     if (localStorage.getItem("browserNotify") !== "true" || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
-    for (const n of notifs) {
-      if (knownNotifIds.current.has(n.id)) continue;
-      knownNotifIds.current.add(n.id);
-      const bookingUrl = buildBookingLink(n.date, n.hour);
-      const notif = new Notification(
-        n.type === "slot_opened" ? "Court slot opened" : "Court available",
-        { body: n.message, icon: "/tennis.svg", tag: `watch-${n.id}` }
-      );
-      notif.onclick = () => window.open(bookingUrl, "_blank");
+    for (const item of notifs) {
+      if (knownNotifIds.current.has(item.id)) continue;
+      knownNotifIds.current.add(item.id);
+      const bookingUrl = buildBookingLink(item.date, item.hour);
+      const popup = new Notification(item.type === "slot_opened" ? "Court slot opened" : "Court available", {
+        body: item.message,
+        icon: "/tennis.svg",
+        tag: `watch-${item.id}`,
+      });
+      popup.onclick = () => window.open(bookingUrl, "_blank", "noopener");
     }
   }, []);
 
@@ -98,41 +124,36 @@ export default function Dashboard() {
     const email = storedEmail();
     if (!email) {
       setNotifications([]);
+      seededFor.current = null;
       return;
     }
     const res = await fetch(`/api/notifications?email=${encodeURIComponent(email)}`);
-    const data = await res.json();
-    if (res.ok) {
-      const notifs = data.notifications ?? [];
-      setNotifications(notifs);
-      showBrowserAlerts(notifs);
-    }
+    const data = await readJson(res);
+    if (!res.ok) return;
+    const notifs = Array.isArray(data.notifications) ? (data.notifications as AlertItem[]) : [];
+    setNotifications(notifs);
+    showBrowserAlerts(notifs, email);
   }, [showBrowserAlerts]);
 
   const runPoll = useCallback(async () => {
-    setPolling(true);
     try {
       const res = await fetch("/api/poll", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        setLastPoll(new Date());
-        setNotifications(data.notifications ?? []);
-        showBrowserAlerts(data.notifications ?? []);
-        if (data.poll?.triggered > 0) await fetchAvailability();
-        await fetchHealth();
-      }
-    } finally {
-      setPolling(false);
+      if (!res.ok) return;
+      await Promise.all([refreshNotifications(), fetchHealth(), fetchAvailability()]);
+    } catch {
+      // Local polling is best-effort. The grid still refreshes on its own timer.
     }
-  }, [fetchAvailability, fetchHealth, showBrowserAlerts]);
+  }, [fetchAvailability, fetchHealth, refreshNotifications]);
 
   const refresh = useCallback(async () => {
     setError("");
+    setRefreshing(true);
     try {
       await Promise.all([fetchAvailability(), fetchWatches(), fetchHealth()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
+      setRefreshing(false);
       setLoading(false);
     }
   }, [fetchAvailability, fetchWatches, fetchHealth]);
@@ -150,18 +171,23 @@ export default function Dashboard() {
       const email = params.get("email");
       const activated = params.get("activated") ?? "0";
       if (email) localStorage.setItem("watchEmail", email.toLowerCase());
+      setBannerTone("ok");
       setBanner(`Email confirmed. ${activated} watch${activated === "1" ? "" : "es"} activated.`);
       fetchWatches();
+      refreshNotifications();
     } else if (verified === "invalid") {
+      setBannerTone("error");
       setBanner("That confirmation link is invalid or expired.");
     } else if (verified === "rate_limited") {
+      setBannerTone("warn");
       setBanner("Too many confirmation attempts. Wait a minute and try again.");
     } else if (verified !== "missing") {
+      setBannerTone("error");
       setBanner("Could not confirm email. Create a watch again to resend.");
     }
 
     window.history.replaceState({}, "", "/");
-  }, [fetchWatches]);
+  }, [fetchWatches, refreshNotifications]);
 
   useEffect(() => {
     const useClientPoll =
@@ -181,101 +207,257 @@ export default function Dashboard() {
   }, [runPoll, refreshNotifications, fetchHealth]);
 
   useEffect(() => {
-    const interval = setInterval(fetchAvailability, 60_000);
+    const interval = setInterval(() => {
+      fetchAvailability().catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Failed to load courts");
+      });
+    }, 60_000);
     return () => clearInterval(interval);
   }, [fetchAvailability]);
 
   async function handleCancelWatch(id: number) {
     const email = storedEmail();
     if (!email) return;
-    await fetch(`/api/watches?id=${id}&email=${encodeURIComponent(email)}`, { method: "DELETE" });
-    fetchWatches();
+    const res = await fetch(`/api/watches?id=${id}&email=${encodeURIComponent(email)}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await readJson(res);
+      setError(typeof data.error === "string" ? data.error : "Could not cancel that watch");
+      return;
+    }
+    await fetchWatches();
   }
+
+  const filteredSlots = useMemo(() => {
+    return slots.filter((slot) => {
+      if (filter === "open") return slot.isBookable;
+      if (filter === "full") return slot.isOpen && slot.courtsAvailable === 0;
+      if (filter === "soon") return !slot.isOpen;
+      return true;
+    });
+  }, [slots, filter]);
+
+  const nextOpening = useMemo(() => {
+    return slots
+      .filter((slot) => !slot.isOpen)
+      .sort((a, b) => a.opensAt.localeCompare(b.opensAt))[0];
+  }, [slots]);
+
+  const counts = useMemo(
+    () => ({
+      open: slots.filter((slot) => slot.isBookable).length,
+      full: slots.filter((slot) => slot.isOpen && slot.courtsAvailable === 0).length,
+      soon: slots.filter((slot) => !slot.isOpen).length,
+    }),
+    [slots]
+  );
 
   const healthDot =
     health.status === "ok"
-      ? "bg-green-500"
+      ? "bg-[#1f7a4d]"
       : health.status === "degraded"
-        ? "bg-terp-gold"
+        ? "bg-[#c8962e]"
         : health.status === "down"
-          ? "bg-red-500"
-          : "bg-neutral-400";
+          ? "bg-[#9f1d2a]"
+          : "bg-ink/30";
 
   const healthLabel =
     health.status === "ok"
-      ? "Live"
+      ? "Checks live"
       : health.status === "degraded"
-        ? "Delayed"
+        ? "Checks delayed"
         : health.status === "down"
-          ? "Down"
-          : "…";
+          ? "Checks down"
+          : "No checks yet";
 
-  const watchCount = watches.filter((w) => w.status === "active" || w.status === "pending").length;
+  const watchCount = watches.filter((watch) => watch.status === "active" || watch.status === "pending").length;
+  const targetSlot = watchTarget
+    ? slots.find((slot) => slot.date === watchTarget.date && slot.hour === watchTarget.hour)
+    : undefined;
+
+  const bannerClass =
+    bannerTone === "ok"
+      ? "border-[#b7dfc8] bg-open text-[#0f6b3c]"
+      : bannerTone === "error"
+        ? "border-[#f3c1c1] bg-full text-[#9f1d2a]"
+        : "border-[#f0ddb0] bg-soon text-[#8a5a12]";
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white">
+      <a
+        href="#courts"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-card focus:px-3 focus:py-2"
+      >
+        Skip to courts
+      </a>
+      <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur">
+        <div className="h-1 bg-terp-red" />
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold sm:text-2xl">
-              <span className="text-terp-red">UMD</span> Tennis Alerts
-            </h1>
-            <p className="text-xs text-neutral-500">Eppley Recreation Center · 8 courts · 48h advance booking</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <img src="/tennis.svg" alt="" width={40} height={40} className="h-10 w-10 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-terp-red">
+                Eppley · UMD
+              </p>
+              <h1 className="truncate font-display text-xl font-semibold tracking-tight sm:text-2xl">Court alerts</h1>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="hidden items-center gap-2 text-xs text-neutral-500 sm:flex" title="Poller health">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <a
+              href="/api/health"
+              className="flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-xs text-ink/70"
+              title="Poller health"
+            >
               <span className={`h-2 w-2 rounded-full ${healthDot}`} />
-              <span>{polling ? "Checking…" : healthLabel}</span>
-              {lastPoll && !polling ? (
-                <span className="text-neutral-400">
+              <span className="hidden sm:inline">{healthLabel}</span>
+              {lastPoll ? (
+                <span className="tabular-nums text-ink/50">
                   {lastPoll.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                 </span>
               ) : null}
-            </div>
-            <a href={PLANYO.BOOKING_URL} target="_blank" rel="noopener noreferrer" className="btn-primary">
-              Book on Planyo
+            </a>
+            <a href={PLANYO.BOOKING_URL} target="_blank" rel="noopener noreferrer" className="btn-primary !px-3 !py-1.5">
+              Book
             </a>
           </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
-        <p className="mb-5 max-w-2xl text-sm text-neutral-600">
-          Click <strong className="font-medium text-neutral-800">Watch</strong> on a slot, confirm your email, and get
-          alerted when booking opens or a court frees up.
+        <p className="max-w-2xl text-sm leading-relaxed text-ink/75">
+          Eppley opens its 8 tennis courts exactly 48 hours before play. Watch a slot and get an email when booking
+          opens, or when someone cancels.
         </p>
 
+        {nextOpening ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#f0ddb0] bg-soon px-4 py-3">
+            <p className="text-sm text-[#6d4710]">
+              <span className="font-semibold">Next window. </span>
+              {formatDate(nextOpening.date)} at {formatHour(nextOpening.hour)} opens {formatOpensAt(nextOpening.opensAt)} (
+              {timeUntil(nextOpening.opensAt)}).
+            </p>
+            <button
+              type="button"
+              className="btn-secondary !bg-white !py-1.5 text-xs"
+              onClick={() => setWatchTarget({ date: nextOpening.date, hour: nextOpening.hour })}
+              disabled={watchedSlots.has(`${nextOpening.date}:${nextOpening.hour}`)}
+            >
+              {watchedSlots.has(`${nextOpening.date}:${nextOpening.hour}`) ? "Watching" : "Watch it"}
+            </button>
+          </div>
+        ) : null}
+
         {(error || banner) && (
-          <div className="mb-5 space-y-2">
-            {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-            )}
-            {banner && (
-              <div className="flex items-start justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="mt-4 space-y-2" aria-live="polite">
+            {error ? (
+              <div className="rounded-lg border border-[#f3c1c1] bg-full px-4 py-3 text-sm text-[#9f1d2a]">{error}</div>
+            ) : null}
+            {banner ? (
+              <div className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${bannerClass}`}>
                 <span>{banner}</span>
-                <button type="button" onClick={() => setBanner("")} className="text-xs text-amber-700 hover:underline">
+                <button type="button" onClick={() => setBanner("")} className="text-xs font-semibold underline">
                   Dismiss
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.9fr)]">
-          <section className="min-w-0">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Court availability</h2>
-              <button type="button" onClick={refresh} className="btn-ghost !px-2 !py-1 text-xs">
-                Refresh
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.9fr)]">
+          <section id="courts" className="min-w-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-display text-lg font-semibold">Court availability</h2>
+              <button type="button" onClick={refresh} className="btn-ghost !px-2 !py-1 text-xs" disabled={refreshing}>
+                {refreshing ? "Refreshing…" : "Refresh"}
               </button>
             </div>
+
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg border border-line bg-card p-0.5" role="group" aria-label="Days to show">
+                {[3, 7].map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setDays(option)}
+                    aria-pressed={days === option}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+                      days === option ? "bg-ink text-card" : "text-ink/70 hover:text-ink"
+                    }`}
+                  >
+                    {option} days
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1" role="group" aria-label="Filter slots">
+                {(
+                  [
+                    ["all", "All"],
+                    ["open", `Open ${counts.open}`],
+                    ["full", `Full ${counts.full}`],
+                    ["soon", `Opening ${counts.soon}`],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFilter(value)}
+                    aria-pressed={filter === value}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      filter === value ? "bg-ink text-card" : "bg-card text-ink/70 ring-1 ring-line hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {days > 3 && filteredSlots.length > 0 ? (
+              <nav className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Jump to a day">
+                {Array.from(new Set(filteredSlots.map((slot) => slot.date)))
+                  .sort()
+                  .map((date) => (
+                    <a
+                      key={date}
+                      href={`#day-${date}`}
+                      className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-ink/80 ring-1 ring-line hover:text-ink"
+                    >
+                      {formatDateShort(date)}
+                    </a>
+                  ))}
+              </nav>
+            ) : null}
+
+            <ul className="mb-3 flex flex-wrap gap-3 text-xs text-ink/70">
+              <li className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#1f7a4d]" /> Open now
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#9f1d2a]" /> Full
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#c8962e]" /> Opens later
+              </li>
+            </ul>
+
             {loading ? (
-              <div className="panel px-6 py-12 text-center text-sm text-neutral-500">Loading courts…</div>
+              <div className="panel p-4" aria-hidden>
+                <div className="mb-3 h-5 w-40 animate-pulse rounded bg-line" />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <div key={index} className="h-28 animate-pulse rounded-lg bg-[#efe7da]" />
+                  ))}
+                </div>
+              </div>
             ) : (
               <AvailabilityGrid
-                slots={slots}
+                slots={filteredSlots}
                 watchedSlots={watchedSlots}
                 onWatch={(date, hour) => setWatchTarget({ date, hour })}
+                emptyLabel={
+                  slots.length === 0
+                    ? "No upcoming slots found. Courts book up to 48 hours ahead."
+                    : "Nothing matches this filter."
+                }
               />
             )}
           </section>
@@ -283,47 +465,51 @@ export default function Dashboard() {
           <aside className="space-y-6">
             <section>
               <div className="mb-2 flex items-baseline justify-between">
-                <h2 className="text-lg font-semibold">Your watches</h2>
-                <span className="text-xs text-neutral-500">{watchCount}</span>
+                <h2 className="font-display text-lg font-semibold">Your watches</h2>
+                <span className="text-xs tabular-nums text-ink/50">{watchCount}</span>
               </div>
               <WatchList watches={watches} onCancel={handleCancelWatch} />
             </section>
             <section>
-              <h2 className="mb-2 text-lg font-semibold">Recent alerts</h2>
+              <h2 className="mb-2 font-display text-lg font-semibold">Recent alerts</h2>
               <NotificationFeed notifications={notifications} />
             </section>
           </aside>
         </div>
 
-        <section className="panel mt-8 px-4 py-4 text-sm text-neutral-600">
-          <h3 className="font-semibold text-neutral-800">How it works</h3>
-          <p className="mt-1">
-            UMD opens Eppley tennis courts for booking exactly 48 hours before play time. Watch a slot to get an email
-            when it opens or when someone cancels.
+        <section className="panel mt-8 px-4 py-4 text-sm text-ink/75">
+          <h3 className="font-semibold text-ink">How a watch works</h3>
+          <p className="mt-1 leading-relaxed">
+            A Friday 4:00 PM court opens for booking on Wednesday at 4:00 PM Eastern. Set the watch before then. After
+            the window is open, the same watch emails you if a booked court cancels.
           </p>
         </section>
       </main>
 
-      <footer className="border-t border-neutral-200 bg-white px-4 py-4 text-center text-xs text-neutral-500">
+      <footer className="border-t border-line px-4 py-4 text-center text-xs text-ink/50">
         Unofficial community tool · Not affiliated with UMD, RecWell, or Planyo ·{" "}
-        <a href="/api/health" className="underline hover:text-neutral-800">
+        <a href="/api/health" className="underline hover:text-ink">
           Status
         </a>
       </footer>
 
-      {watchTarget && (
+      {watchTarget ? (
         <WatchForm
+          key={`${watchTarget.date}-${watchTarget.hour}`}
           date={watchTarget.date}
           hour={watchTarget.hour}
+          isOpen={targetSlot?.isOpen ?? false}
+          opensAt={targetSlot?.opensAt}
           onClose={() => setWatchTarget(null)}
           onCreated={(info) => {
             fetchWatches();
             if (info?.needsVerification) {
-              setBanner("Check your inbox to confirm your email — watches stay pending until verified.");
+              setBannerTone("warn");
+              setBanner("Check your inbox to confirm your email. Watches stay pending until then.");
             }
           }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

@@ -12,8 +12,12 @@ export const LIMITS = {
   MAX_POLL_SLOT_LOOKUPS: 120,
   /** Notification cooldown (cross-instance via Redis when available) */
   NOTIFY_COOLDOWN_MS: 5 * 60 * 1000,
-  /** Poll considered stale after this (minute cron expected) */
-  POLL_STALE_MS: 10 * 60 * 1000,
+  /**
+   * GitHub Actions polls every 5 minutes (Hobby Vercel crons cannot).
+   * Stale after a couple of missed runs; down after half an hour without a success.
+   */
+  POLL_INTERVAL_MS: 5 * 60 * 1000,
+  POLL_STALE_MS: 15 * 60 * 1000,
   POLL_DOWN_MS: 30 * 60 * 1000,
   /** Retention */
   NOTIFICATION_RETENTION_DAYS: 30,

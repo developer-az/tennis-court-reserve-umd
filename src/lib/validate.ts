@@ -1,5 +1,6 @@
 import { PLANYO } from "./constants";
 import { DATE_RE, DISCORD_WEBHOOK_RE, EMAIL_RE, LIMITS } from "./limits";
+import { todayInTimeZone } from "./time";
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -18,9 +19,11 @@ export function isValidDate(date: string): boolean {
 
 export function isWatchDateAllowed(date: string, now = new Date()): boolean {
   if (!isValidDate(date)) return false;
+  const todayStr = todayInTimeZone(now, PLANYO.TIMEZONE);
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const today = new Date(ty, tm - 1, td);
   const [y, m, d] = date.split("-").map(Number);
   const slotDay = new Date(y, m - 1, d);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const max = new Date(today);
   max.setDate(max.getDate() + LIMITS.MAX_WATCH_AHEAD_DAYS);
   return slotDay >= today && slotDay <= max;

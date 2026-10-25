@@ -9,40 +9,45 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #f5f5f5;
-  color: #1a1a1a;
+  background: #f3efe6;
+  color: #1c1916;
 }
 
 @layer components {
   .panel {
-    @apply rounded-lg border border-neutral-200 bg-white;
+    @apply rounded-xl border border-line bg-card;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition
-      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terp-red
+    @apply inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink
       disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn bg-terp-red text-white hover:bg-[#c83236];
+    @apply btn bg-terp-gold text-ink hover:bg-[#f0c400];
   }
 
   .btn-secondary {
-    @apply btn border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50;
+    @apply btn border border-line bg-card text-ink hover:bg-[#f7f1e6];
   }
 
   .btn-ghost {
-    @apply btn text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800;
+    @apply btn text-ink/70 hover:bg-ink/5 hover:text-ink;
   }
 
   .field {
-    @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm
-      outline-none placeholder:text-neutral-400 focus:border-terp-red focus:ring-1 focus:ring-terp-red;
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm
+      outline-none placeholder:text-ink/40 focus:border-ink focus:ring-1 focus:ring-ink;
   }
 
   .label {
-    @apply mb-1 block text-sm font-medium text-neutral-700;
+    @apply mb-1 block text-sm font-semibold text-ink;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
   }
 }
