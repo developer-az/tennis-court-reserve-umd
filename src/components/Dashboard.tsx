@@ -113,7 +113,7 @@ export default function Dashboard() {
       const bookingUrl = buildBookingLink(item.date, item.hour);
       const popup = new Notification(item.type === "slot_opened" ? "Court slot opened" : "Court available", {
         body: item.message,
-        icon: "/tennis.svg",
+        icon: "/brand-mark.svg",
         tag: `watch-${item.id}`,
       });
       popup.onclick = () => window.open(bookingUrl, "_blank", "noopener");
@@ -289,55 +289,51 @@ export default function Dashboard() {
       >
         Skip to courts
       </a>
-      <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur-sm">
         <div className="h-1 bg-terp-red" />
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <img src="/tennis.svg" alt="" width={40} height={40} className="h-10 w-10 shrink-0" />
-            <div className="min-w-0">
-              <p className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-terp-red">
-                Eppley · UMD
-              </p>
-              <h1 className="truncate font-display text-xl font-semibold tracking-tight sm:text-2xl">Court alerts</h1>
-            </div>
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2.5 px-3 sm:gap-3 sm:px-6">
+          <img src="/brand-mark.svg" alt="" width={36} height={36} className="h-9 w-9 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-display text-lg leading-none font-semibold tracking-tight sm:text-2xl">
+              Court alerts
+            </h1>
+            <p className="mt-1 truncate text-[11px] font-semibold tracking-wide text-terp-red">Eppley tennis</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <a
-              href="/api/health"
-              className="flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-xs text-ink/70"
-              title="Poller health"
-            >
-              <span className={`h-2 w-2 rounded-full ${healthDot}`} />
-              <span className="hidden sm:inline">{healthLabel}</span>
-              {lastPoll ? (
-                <span className="tabular-nums text-ink/50">
-                  {lastPoll.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                </span>
-              ) : null}
-            </a>
-            <a href={PLANYO.BOOKING_URL} target="_blank" rel="noopener noreferrer" className="btn-primary !px-3 !py-1.5">
-              Book
-            </a>
-          </div>
+          <a
+            href="/api/health"
+            className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-line px-2.5 text-xs text-ink/70"
+            title={healthLabel}
+          >
+            <span className={`h-2 w-2 rounded-full ${healthDot}`} />
+            <span className="hidden sm:inline">{healthLabel}</span>
+          </a>
+          <a
+            href={PLANYO.BOOKING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary h-9 shrink-0 px-3! py-0!"
+          >
+            Book
+          </a>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-6 sm:py-8">
         <p className="max-w-2xl text-sm leading-relaxed text-ink/75">
-          Eppley opens its 8 tennis courts exactly 48 hours before play. Watch a slot and get an email when booking
-          opens, or when someone cancels.
+          Eight Eppley courts. Each hour opens 48 hours ahead. Watch a slot and get an email when booking opens, or when
+          a court frees up.
         </p>
 
         {nextOpening ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#f0ddb0] bg-soon px-4 py-3">
+          <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-[#f0ddb0] border-l-4 border-l-[#c8962e] bg-soon px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-[#6d4710]">
               <span className="font-semibold">Next window. </span>
-              {formatDate(nextOpening.date)} at {formatHour(nextOpening.hour)} opens {formatOpensAt(nextOpening.opensAt)} (
-              {timeUntil(nextOpening.opensAt)}).
+              {formatDate(nextOpening.date)} at {formatHour(nextOpening.hour)} opens {formatOpensAt(nextOpening.opensAt)}{" "}
+              ({timeUntil(nextOpening.opensAt)}).
             </p>
             <button
               type="button"
-              className="btn-secondary !bg-white !py-1.5 text-xs"
+              className="btn-secondary h-11 w-full bg-white! text-sm sm:h-auto sm:w-auto sm:py-1.5! sm:text-xs"
               onClick={() => setWatchTarget({ date: nextOpening.date, hour: nextOpening.hour })}
               disabled={watchedSlots.has(`${nextOpening.date}:${nextOpening.hour}`)}
             >
@@ -362,89 +358,90 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.9fr)]">
+        <div className="mt-4 grid gap-6 lg:mt-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.9fr)]">
           <section id="courts" className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-display text-lg font-semibold">Court availability</h2>
-              <button type="button" onClick={refresh} className="btn-ghost !px-2 !py-1 text-xs" disabled={refreshing}>
+              <button type="button" onClick={refresh} className="btn-ghost px-2! py-1! text-xs" disabled={refreshing}>
                 {refreshing ? "Refreshing…" : "Refresh"}
               </button>
             </div>
 
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <div className="flex rounded-lg border border-line bg-card p-0.5" role="group" aria-label="Days to show">
-                {[3, 7].map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setDays(option)}
-                    aria-pressed={days === option}
-                    className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-                      days === option ? "bg-ink text-card" : "text-ink/70 hover:text-ink"
-                    }`}
-                  >
-                    {option} days
-                  </button>
-                ))}
+            <div className="sticky top-[60px] z-30 -mx-3 mb-3 border-b border-line bg-paper/95 px-3 py-2 backdrop-blur-sm sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                <div className="flex shrink-0 rounded-lg border border-line bg-card p-0.5" role="group" aria-label="Days to show">
+                  {[3, 7].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setDays(option)}
+                      aria-pressed={days === option}
+                      className={`h-9 rounded-md px-3 text-xs font-semibold sm:h-auto sm:px-2.5 sm:py-1 ${
+                        days === option ? "bg-ink text-card" : "text-ink/70 hover:text-ink"
+                      }`}
+                    >
+                      {option} days
+                    </button>
+                  ))}
+                </div>
+                <div className="flex shrink-0 gap-1" role="group" aria-label="Filter slots">
+                  {(
+                    [
+                      ["all", "All"],
+                      ["open", `Open ${counts.open}`],
+                      ["full", `Full ${counts.full}`],
+                      ["soon", `Opening ${counts.soon}`],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFilter(value)}
+                      aria-pressed={filter === value}
+                      className={`h-9 rounded-full px-3 text-xs font-semibold sm:h-auto sm:px-2.5 sm:py-1 ${
+                        filter === value ? "bg-ink text-card" : "bg-card text-ink/70 ring-1 ring-line hover:text-ink"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1" role="group" aria-label="Filter slots">
-                {(
-                  [
-                    ["all", "All"],
-                    ["open", `Open ${counts.open}`],
-                    ["full", `Full ${counts.full}`],
-                    ["soon", `Opening ${counts.soon}`],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setFilter(value)}
-                    aria-pressed={filter === value}
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      filter === value ? "bg-ink text-card" : "bg-card text-ink/70 ring-1 ring-line hover:text-ink"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {days > 3 && filteredSlots.length > 0 ? (
+                <nav className="mt-2 flex gap-2 overflow-x-auto" aria-label="Jump to a day">
+                  {Array.from(new Set(filteredSlots.map((slot) => slot.date)))
+                    .sort()
+                    .map((date) => (
+                      <a
+                        key={date}
+                        href={`#day-${date}`}
+                        className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-ink/80 ring-1 ring-line hover:text-ink"
+                      >
+                        {formatDateShort(date)}
+                      </a>
+                    ))}
+                </nav>
+              ) : null}
             </div>
 
-            {days > 3 && filteredSlots.length > 0 ? (
-              <nav className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Jump to a day">
-                {Array.from(new Set(filteredSlots.map((slot) => slot.date)))
-                  .sort()
-                  .map((date) => (
-                    <a
-                      key={date}
-                      href={`#day-${date}`}
-                      className="shrink-0 rounded-full bg-card px-2.5 py-1 text-xs font-semibold text-ink/80 ring-1 ring-line hover:text-ink"
-                    >
-                      {formatDateShort(date)}
-                    </a>
-                  ))}
-              </nav>
-            ) : null}
-
-            <ul className="mb-3 flex flex-wrap gap-3 text-xs text-ink/70">
+            <ul className="mb-3 hidden flex-wrap gap-3 text-xs text-ink/70 sm:flex">
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#1f7a4d]" /> Open now
+                <span className="h-2.5 w-2.5 rounded-xs bg-[#1f7a4d]" /> Open now
               </li>
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#9f1d2a]" /> Full
+                <span className="h-2.5 w-2.5 rounded-xs bg-[#9f1d2a]" /> Full
               </li>
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#c8962e]" /> Opens later
+                <span className="h-2.5 w-2.5 rounded-xs bg-[#c8962e]" /> Opens later
               </li>
             </ul>
 
             {loading ? (
-              <div className="panel p-4" aria-hidden>
-                <div className="mb-3 h-5 w-40 animate-pulse rounded bg-line" />
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="h-28 animate-pulse rounded-lg bg-[#efe7da]" />
+              <div className="panel overflow-hidden" aria-hidden>
+                <div className="h-12 border-b border-line bg-[#f7f1e6]" />
+                <div className="sm:grid sm:grid-cols-3 sm:gap-2 sm:p-3 lg:grid-cols-4">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="h-14 animate-pulse border-b border-line bg-[#efe7da] sm:h-28 sm:rounded-lg sm:border" />
                   ))}
                 </div>
               </div>

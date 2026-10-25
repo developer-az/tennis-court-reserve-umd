@@ -60,7 +60,7 @@ export function WatchList({ watches, onCancel }: Props) {
             <button
               type="button"
               onClick={() => onCancel(watch.id)}
-              className="btn-ghost !px-2 !py-1 text-xs"
+              className="btn-ghost min-h-11 shrink-0 px-3 text-sm sm:min-h-0 sm:px-2! sm:py-1! sm:text-xs"
               aria-label={`Cancel watch for ${formatDateShort(watch.date)} ${formatHour(watch.hour)}`}
             >
               Cancel
