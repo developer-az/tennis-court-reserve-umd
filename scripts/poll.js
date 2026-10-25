@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Standalone poller — run alongside the app for server-side notifications.
- * Usage: npm run poll
- * Or set up a cron job / cron-job.org hitting /api/poll
+ * Local poller for development. Production scheduling is .github/workflows/poll.yml
+ * (every 5 minutes). Usage: npm run poll
  */
 
 const BASE = process.env.APP_URL ?? "http://localhost:3000";

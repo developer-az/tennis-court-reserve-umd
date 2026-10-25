@@ -1,28 +1,15 @@
 import { LIMITS } from "./limits";
+import { redisCommand, redisConfigured } from "./redis";
 
 type Bucket = { count: number; resetAt: number };
 
 const memory = new Map<string, Bucket>();
 
-function redisConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-}
-
-async function redisCommand<T>(...args: (string | number)[]): Promise<T> {
-  const url = process.env.UPSTASH_REDIS_REST_URL!;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN!;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Redis error: ${res.status}`);
-  const data = (await res.json()) as { result: T };
-  return data.result;
+function sweepMemory(now: number): void {
+  if (memory.size < 500) return;
+  for (const [key, bucket] of memory) {
+    if (bucket.resetAt <= now) memory.delete(key);
+  }
 }
 
 async function redisIncr(key: string, windowMs: number): Promise<{ count: number; resetAt: number }> {
@@ -39,6 +26,7 @@ async function redisIncr(key: string, windowMs: number): Promise<{ count: number
 
 function memoryIncr(key: string, windowMs: number): { count: number; resetAt: number } {
   const now = Date.now();
+  sweepMemory(now);
   const existing = memory.get(key);
   if (!existing || existing.resetAt <= now) {
     const bucket = { count: 1, resetAt: now + windowMs };

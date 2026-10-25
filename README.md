@@ -11,7 +11,7 @@ Get email notifications when Eppley tennis court reservation slots open on UMD's
 - **Discord webhooks** — optional push to your phone
 - **Browser notifications** — while the tab is open
 - **Health endpoint** — `/api/health` for cron / uptime monitors
-- **Deployable** — Vercel + Upstash Redis + minute cron
+- **Deployable** — Vercel + Upstash Redis + a poll every 5 minutes
 
 ## Quick start (local)
 
@@ -63,22 +63,30 @@ Optional: `SENTRY_DSN` for error reporting.
 
 Redeploy after saving.
 
-### 4. Minute polling (important)
+### 4. Polling (important)
 
-Vercel Hobby only runs crons **once per day**. For slot-open alerts you need **every minute**:
+Vercel Hobby only runs the cron in `vercel.json` **once per day** (noon UTC). That is too slow for slot-open alerts: a court can book up in minutes, and `/api/health` treats data older than 15 minutes as stale.
 
-**Option A — free external cron (recommended on Hobby)**
+**Option A — GitHub Actions every 5 minutes (recommended on Hobby)**
 
-1. Go to [cron-job.org](https://cron-job.org) (free)
-2. Create a job every 1 minute
-3. URL: `https://YOUR-APP.vercel.app/api/poll`
-4. Header: `Authorization: Bearer YOUR_CRON_SECRET`
+This repo’s public `Poll` workflow calls `POST /api/poll` on that cadence. GitHub’s shortest schedule is 5 minutes, which stays inside the health window and does not need another account. Upstash QStash’s free tier is 1,000 messages/day, so a true every-minute schedule (1,440/day) does not fit there.
 
-Point an uptime monitor at `https://YOUR-APP.vercel.app/api/health` (expects `status: ok` when polling is fresh).
+After the workflow is on `master`, add repository secrets (Settings → Secrets and variables → Actions) with the same values as Vercel:
+
+- `APP_URL` — `https://YOUR-APP.vercel.app`
+- `CRON_SECRET` — the bearer token
+
+You can run it once from the Actions tab with **Run workflow** to confirm. The daily Vercel cron stays as a backup if those secrets are missing; open alerts still fire once on that backup, but they will be late and health will show down for most of the day.
 
 **Option B — Vercel Pro**
 
-Change `vercel.json` cron to `* * * * *` for every-minute checks. Hobby only allows one run per day (currently noon UTC).
+Change `vercel.json` to `* * * * *` for every-minute checks.
+
+**Option C — any other scheduler**
+
+`POST https://YOUR-APP.vercel.app/api/poll` with header `Authorization: Bearer YOUR_CRON_SECRET`. Do not put the secret in the query string.
+
+Point an uptime monitor at `https://YOUR-APP.vercel.app/api/health` (expects `status: ok` when polling is fresh).
 
 ## How booking works
 
