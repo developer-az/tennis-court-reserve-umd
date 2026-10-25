@@ -1,0 +1,10 @@
+---
+description: Never add AI agent attribution to git commits or PR bodies in this repo.
+alwaysApply: true
+---
+
+# No AI agent git attribution
+
+- Do not add `Co-authored-by: Cursor`, `Co-authored-by: Claude`, `Made-with: Cursor`, or `Claude-Session:` to commits or PR descriptions.
+- Use plain commit messages only; do not use `git commit --trailer` for agents.
+- Repo hooks strip agent trailers on commit; CI fails pushes/PRs that include them.
