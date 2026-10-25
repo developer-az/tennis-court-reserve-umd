@@ -1,4 +1,5 @@
 import { PLANYO } from "./constants";
+import { addCalendarDays, zonedParts, zonedWallTime } from "./time";
 
 export { PLANYO, buildBookingLink } from "./constants";
 
@@ -51,25 +52,27 @@ function pad(n: number) {
 }
 
 export function formatDateTime(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:00:00`;
+  const parts = zonedParts(d, PLANYO.TIMEZONE);
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)} ${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`;
 }
 
+/** Slot start as an absolute instant. `hour` is America/New_York wall time, not server local. */
 export function parseSlotDateTime(date: string, hour: number): Date {
-  return new Date(`${date}T${pad(hour)}:00:00`);
+  return zonedWallTime(date, hour, 0, PLANYO.TIMEZONE);
 }
 
+/** Same Eastern clock time, two calendar days earlier (Friday 4 PM opens Wednesday 4 PM). */
 export function getOpensAt(slotStart: Date): Date {
-  const opens = new Date(slotStart);
-  opens.setDate(opens.getDate() - PLANYO.MAX_AHEAD_DAYS);
-  return opens;
+  const wall = zonedParts(slotStart, PLANYO.TIMEZONE);
+  const openDate = addCalendarDays(
+    `${wall.year}-${pad(wall.month)}-${pad(wall.day)}`,
+    -PLANYO.MAX_AHEAD_DAYS
+  );
+  return zonedWallTime(openDate, wall.hour, 0, PLANYO.TIMEZONE);
 }
 
 export function isSlotOpenForBooking(slotStart: Date, now = new Date()): boolean {
-  const opens = getOpensAt(slotStart);
-  const maxBookable = new Date(now);
-  maxBookable.setDate(maxBookable.getDate() + PLANYO.MAX_AHEAD_DAYS);
-  maxBookable.setHours(23, 59, 59, 999);
-  return now >= opens && slotStart > now;
+  return now >= getOpensAt(slotStart) && slotStart > now;
 }
 
 export async function fetchMonthData(year: number, month: number): Promise<MonthData> {
@@ -77,6 +80,7 @@ export async function fetchMonthData(year: number, month: number): Promise<Month
   const res = await fetch(url, {
     headers: { "User-Agent": "UMD-Tennis-Reserve/1.0" },
     next: { revalidate: 30 },
+    signal: AbortSignal.timeout(8_000),
   });
   if (!res.ok) throw new Error(`Planyo fetch-data failed: ${res.status}`);
   const data = (await res.json()) as PlanyoFetchResponse;
@@ -119,8 +123,7 @@ export async function searchSlot(date: string, hour: number): Promise<{
   reason?: string;
 }> {
   const start = parseSlotDateTime(date, hour);
-  const end = new Date(start);
-  end.setHours(end.getHours() + PLANYO.SLOT_HOURS);
+  const end = new Date(start.getTime() + PLANYO.SLOT_HOURS * 60 * 60 * 1000);
 
   const body = new URLSearchParams({
     ulap_url: "https://www.planyo.com/rest/planyo-reservations.php",
@@ -144,9 +147,16 @@ export async function searchSlot(date: string, hour: number): Promise<{
     },
     body: body.toString(),
     cache: "no-store",
+    signal: AbortSignal.timeout(8_000),
   });
 
-  const data = (await res.json()) as PlanyoSearchResponse;
+  if (!res.ok) throw new Error(`Planyo search failed: ${res.status}`);
+  let data: PlanyoSearchResponse;
+  try {
+    data = (await res.json()) as PlanyoSearchResponse;
+  } catch {
+    throw new Error("Planyo search returned invalid JSON");
+  }
 
   if (data.response_code !== 0 || !data.data?.results?.length) {
     const reason = data.data?.reason_not_listed;
@@ -173,9 +183,18 @@ function getVacationBlocked(dayVacations: Record<string, Record<string, { v: num
   return typeof hourData.v === "string" ? parseInt(hourData.v, 10) : hourData.v;
 }
 
-export async function getDaySlots(date: string, now = new Date()): Promise<SlotAvailability[]> {
+export async function getDaySlots(
+  date: string,
+  now = new Date(),
+  monthCache?: Map<string, MonthData>
+): Promise<SlotAvailability[]> {
   const [y, m, d] = date.split("-").map(Number);
-  const monthData = await fetchMonthData(y, m);
+  const cacheKey = `${y}-${m}`;
+  let monthData = monthCache?.get(cacheKey);
+  if (!monthData) {
+    monthData = await fetchMonthData(y, m);
+    monthCache?.set(cacheKey, monthData);
+  }
   const dayKey = String(d);
   const dayUsage = monthData.resUsage[dayKey] ?? {};
   const dayVacations = monthData.vacations[dayKey];
@@ -194,8 +213,7 @@ export async function getDaySlots(date: string, now = new Date()): Promise<SlotA
     const opensAt = getOpensAt(slotStart);
     const isOpen = isSlotOpenForBooking(slotStart, now);
 
-    const end = new Date(slotStart);
-    end.setHours(end.getHours() + 1);
+    const end = new Date(slotStart.getTime() + PLANYO.SLOT_HOURS * 60 * 60 * 1000);
 
     slots.push({
       date,
@@ -214,14 +232,12 @@ export async function getDaySlots(date: string, now = new Date()): Promise<SlotA
   return slots;
 }
 
-export async function getSlotsInRange(startDate: string, days: number): Promise<SlotAvailability[]> {
+export async function getSlotsInRange(startDate: string, days: number, now = new Date()): Promise<SlotAvailability[]> {
   const all: SlotAvailability[] = [];
-  const start = new Date(`${startDate}T12:00:00`);
-  for (let i = 0; i < days; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const daySlots = await getDaySlots(dateStr);
+  const monthCache = new Map<string, MonthData>();
+  const count = Number.isFinite(days) ? Math.max(0, Math.floor(days)) : 0;
+  for (let i = 0; i < count; i++) {
+    const daySlots = await getDaySlots(addCalendarDays(startDate, i), now, monthCache);
     all.push(...daySlots);
   }
   return all;

@@ -1,4 +1,7 @@
+import { PLANYO } from "./constants";
 import { LIMITS } from "./limits";
+import { redisCommand, redisConfigured } from "./redis";
+import { zonedWallTime } from "./time";
 
 export type WatchStatus = "pending" | "active" | "triggered" | "cancelled";
 
@@ -14,6 +17,8 @@ export interface Watch {
   status: WatchStatus;
   triggeredAt: string | null;
   lastCourtsAvailable: number | null;
+  /** False until the open alert is sent. Missing on watches created before this field existed. */
+  notifiedOpen?: boolean;
   createdAt: string;
 }
 
@@ -60,27 +65,6 @@ export function defaultStore(): Store {
       lastPollTriggered: 0,
     },
   };
-}
-
-function redisConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-}
-
-async function redisCommand<T>(...args: (string | number)[]): Promise<T> {
-  const url = process.env.UPSTASH_REDIS_REST_URL!;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN!;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Redis error: ${res.status}`);
-  const data = (await res.json()) as { result: T };
-  return data.result;
 }
 
 const REDIS_KEY = "umd-tennis:store";
@@ -268,6 +252,7 @@ export async function createWatch(input: {
       status,
       triggeredAt: null,
       lastCourtsAvailable: null,
+      notifiedOpen: false,
       createdAt: new Date().toISOString(),
     };
     store.watches.push(watch);
@@ -435,26 +420,89 @@ export async function getPollMeta(): Promise<PollMeta> {
   return store.meta;
 }
 
+function pruneInPlace(store: Store, now: Date): { watches: number; notifications: number } {
+  const watchCutoff = now.getTime() - LIMITS.WATCH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const notifCutoff = now.getTime() - LIMITS.NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  const beforeW = store.watches.length;
+  store.watches = store.watches.filter((w) => {
+    if (w.status === "active" || w.status === "pending") return true;
+    const end = zonedWallTime(w.date, w.hour, 0, PLANYO.TIMEZONE).getTime();
+    const ref = Number.isFinite(end) ? end : new Date(w.createdAt).getTime();
+    return ref >= watchCutoff;
+  });
+
+  const beforeN = store.notifications.length;
+  store.notifications = store.notifications.filter((n) => new Date(n.createdAt).getTime() >= notifCutoff);
+
+  return {
+    watches: beforeW - store.watches.length,
+    notifications: beforeN - store.notifications.length,
+  };
+}
+
 export async function pruneStore(now = new Date()): Promise<{ watches: number; notifications: number }> {
+  return withStoreUpdate((store) => pruneInPlace(store, now));
+}
+
+export interface PollWatchUpdate {
+  id: number;
+  status?: WatchStatus;
+  triggeredAt?: string | null;
+  touchAvailability?: boolean;
+  lastCourtsAvailable?: number | null;
+  notifiedOpen?: boolean;
+}
+
+/** Apply one poll's watch updates, alerts, prune, and health meta in a single store write. */
+export async function commitPoll(input: {
+  now?: Date;
+  updates: PollWatchUpdate[];
+  notifications: Array<{
+    watchId: number;
+    type: Notification["type"];
+    message: string;
+    courtsAvailable?: number;
+  }>;
+  poll: {
+    ok: boolean;
+    checked: number;
+    triggered: number;
+    error?: string | null;
+  };
+}): Promise<{ pruned: { watches: number; notifications: number }; meta: PollMeta }> {
+  const now = input.now ?? new Date();
   return withStoreUpdate((store) => {
-    const watchCutoff = now.getTime() - LIMITS.WATCH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const notifCutoff = now.getTime() - LIMITS.NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    for (const update of input.updates) {
+      const watch = store.watches.find((item) => item.id === update.id);
+      if (!watch || watch.status !== "active") continue;
+      if (update.status) watch.status = update.status;
+      if (update.triggeredAt !== undefined) watch.triggeredAt = update.triggeredAt;
+      if (update.touchAvailability) watch.lastCourtsAvailable = update.lastCourtsAvailable ?? null;
+      if (update.notifiedOpen !== undefined) watch.notifiedOpen = update.notifiedOpen;
+    }
 
-    const beforeW = store.watches.length;
-    store.watches = store.watches.filter((w) => {
-      if (w.status === "active" || w.status === "pending") return true;
-      const end = new Date(`${w.date}T${String(w.hour).padStart(2, "0")}:00:00`).getTime();
-      const ref = Number.isFinite(end) ? end : new Date(w.createdAt).getTime();
-      return ref >= watchCutoff;
-    });
+    for (const inputNotification of input.notifications) {
+      const notification: Notification = {
+        id: store.nextNotificationId++,
+        watchId: inputNotification.watchId,
+        type: inputNotification.type,
+        message: inputNotification.message,
+        courtsAvailable: inputNotification.courtsAvailable ?? null,
+        createdAt: now.toISOString(),
+      };
+      store.notifications.push(notification);
+    }
 
-    const beforeN = store.notifications.length;
-    store.notifications = store.notifications.filter((n) => new Date(n.createdAt).getTime() >= notifCutoff);
-
-    return {
-      watches: beforeW - store.watches.length,
-      notifications: beforeN - store.notifications.length,
+    const pruned = pruneInPlace(store, now);
+    store.meta = {
+      lastPollAt: now.toISOString(),
+      lastPollOk: input.poll.ok,
+      lastPollError: input.poll.error ?? null,
+      lastPollChecked: input.poll.checked,
+      lastPollTriggered: input.poll.triggered,
     };
+    return { pruned, meta: store.meta };
   });
 }
 

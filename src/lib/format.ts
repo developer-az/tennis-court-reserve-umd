@@ -1,3 +1,5 @@
+import { PLANYO } from "./constants";
+
 export function formatHour(hour: number): string {
   const h = hour % 12 || 12;
   const ampm = hour < 12 ? "AM" : "PM";
@@ -15,13 +17,19 @@ export function formatDateShort(date: string): string {
 }
 
 export function formatOpensAt(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
+  const formatted = new Intl.DateTimeFormat("en-US", {
+    timeZone: PLANYO.TIMEZONE,
     weekday: "short",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  });
+  }).format(new Date(iso));
+  return `${formatted} ET`;
+}
+
+export function formatSlotLabel(date: string, hour: number): string {
+  return `${formatDateShort(date)} at ${formatHour(hour)}`;
 }
 
 export function timeUntil(iso: string): string {

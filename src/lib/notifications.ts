@@ -1,5 +1,6 @@
 import { getAppUrl } from "./app-url";
 import { buildBookingLink, PLANYO } from "./constants";
+import { formatSlotLabel } from "./format";
 import { createEmailToken } from "./tokens";
 
 export async function sendDiscordWebhook(
@@ -153,18 +154,6 @@ export async function sendVerificationEmail(email: string): Promise<boolean> {
   return resendSend({ to: email, subject, text, html });
 }
 
-export function formatHour(hour: number): string {
-  const h = hour % 12 || 12;
-  const ampm = hour < 12 ? "AM" : "PM";
-  return `${h}:00 ${ampm}`;
-}
-
-export function formatSlotLabel(date: string, hour: number): string {
-  const d = new Date(`${date}T12:00:00`);
-  const dayName = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  return `${dayName} at ${formatHour(hour)}`;
-}
-
 export function buildOpenNotification(date: string, hour: number, courtsAvailable: number): {
   title: string;
   message: string;
@@ -174,7 +163,7 @@ export function buildOpenNotification(date: string, hour: number, courtsAvailabl
   const bookingUrl = buildBookingLink(date, hour);
   return {
     title: "Court slot is now open for booking!",
-    message: `${label} — ${courtsAvailable} of ${PLANYO.COURT_COUNT} courts available. Book within 48 hours before play time.`,
+    message: `${label} — ${courtsAvailable} of ${PLANYO.COURT_COUNT} courts available. The booking window is open.`,
     bookingUrl,
   };
 }
@@ -201,8 +190,8 @@ export async function deliverAlert(input: {
   bookingUrl: string;
   discordColor?: number;
   extraDiscord?: string;
-}): Promise<void> {
-  const tasks: Promise<unknown>[] = [];
+}): Promise<boolean> {
+  const tasks: Promise<boolean>[] = [];
 
   if (input.email) {
     tasks.push(
@@ -226,5 +215,7 @@ export async function deliverAlert(input: {
     );
   }
 
-  await Promise.all(tasks);
+  if (tasks.length === 0) return false;
+  const results = await Promise.all(tasks);
+  return results.some(Boolean);
 }

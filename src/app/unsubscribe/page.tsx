@@ -28,29 +28,30 @@ export default async function UnsubscribePage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-100 px-4 py-16">
-      <div className="panel w-full max-w-md p-6 text-center shadow-sm">
-        <h1 className="text-xl font-semibold">Unsubscribe</h1>
+    <main className="flex min-h-screen items-center justify-center px-4 py-16">
+      <div className="panel w-full max-w-md p-6 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-terp-red">Eppley · UMD</p>
+        <h1 className="mt-2 font-display text-2xl font-semibold">Unsubscribe</h1>
 
         {state === "ok" && (
           <>
-            <p className="mt-3 text-sm text-neutral-600">
+            <p className="mt-3 text-sm text-ink/75">
               Removed <strong>{email}</strong> and cancelled {cancelled} watch
               {cancelled === 1 ? "" : "es"}.
             </p>
-            <p className="mt-2 text-xs text-neutral-500">
+            <p className="mt-2 text-xs text-ink/55">
               To opt back in later, create a watch and confirm the verification email.
             </p>
           </>
         )}
         {state === "invalid" && (
-          <p className="mt-3 text-sm text-red-600">This unsubscribe link is invalid or expired.</p>
+          <p className="mt-3 text-sm text-[#9f1d2a]">This unsubscribe link is invalid or expired.</p>
         )}
         {state === "missing" && (
-          <p className="mt-3 text-sm text-neutral-600">Open the unsubscribe link from your alert email.</p>
+          <p className="mt-3 text-sm text-ink/75">Open the unsubscribe link from your alert email.</p>
         )}
         {state === "error" && (
-          <p className="mt-3 text-sm text-red-600">Something went wrong. Try again later.</p>
+          <p className="mt-3 text-sm text-[#9f1d2a]">Something went wrong. Try the link again in a minute.</p>
         )}
 
         <a href="/" className="btn-secondary mt-6 inline-flex">

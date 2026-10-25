@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PLANYO } from "@/lib/constants";
 import { getDaySlots, getSlotsInRange } from "@/lib/planyo";
+import { todayInTimeZone } from "@/lib/time";
 import { LIMITS } from "@/lib/limits";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { isValidDate } from "@/lib/validate";
@@ -13,7 +15,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const date = searchParams.get("date");
-  const days = parseInt(searchParams.get("days") ?? "3", 10);
+  const parsedDays = Number.parseInt(searchParams.get("days") ?? "3", 10);
+  const days = Number.isFinite(parsedDays) ? Math.min(Math.max(parsedDays, 1), 7) : 3;
 
   try {
     if (date) {
@@ -27,9 +30,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const today = new Date();
-    const startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    const slots = await getSlotsInRange(startDate, Math.min(Math.max(days, 1), 7));
+    const startDate = todayInTimeZone(new Date(), PLANYO.TIMEZONE);
+    const slots = await getSlotsInRange(startDate, days);
     return NextResponse.json(
       { slots },
       { headers: { ...rateLimitHeaders(rl), "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" } }
