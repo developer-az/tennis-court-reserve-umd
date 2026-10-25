@@ -289,7 +289,7 @@ export default function Dashboard() {
       >
         Skip to courts
       </a>
-      <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur-sm">
         <div className="h-1 bg-terp-red" />
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -315,7 +315,7 @@ export default function Dashboard() {
                 </span>
               ) : null}
             </a>
-            <a href={PLANYO.BOOKING_URL} target="_blank" rel="noopener noreferrer" className="btn-primary !px-3 !py-1.5">
+            <a href={PLANYO.BOOKING_URL} target="_blank" rel="noopener noreferrer" className="btn-primary px-3! py-1.5!">
               Book
             </a>
           </div>
@@ -337,7 +337,7 @@ export default function Dashboard() {
             </p>
             <button
               type="button"
-              className="btn-secondary !bg-white !py-1.5 text-xs"
+              className="btn-secondary bg-white! py-1.5! text-xs"
               onClick={() => setWatchTarget({ date: nextOpening.date, hour: nextOpening.hour })}
               disabled={watchedSlots.has(`${nextOpening.date}:${nextOpening.hour}`)}
             >
@@ -366,7 +366,7 @@ export default function Dashboard() {
           <section id="courts" className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-display text-lg font-semibold">Court availability</h2>
-              <button type="button" onClick={refresh} className="btn-ghost !px-2 !py-1 text-xs" disabled={refreshing}>
+              <button type="button" onClick={refresh} className="btn-ghost px-2! py-1! text-xs" disabled={refreshing}>
                 {refreshing ? "Refreshing…" : "Refresh"}
               </button>
             </div>
@@ -429,19 +429,19 @@ export default function Dashboard() {
 
             <ul className="mb-3 flex flex-wrap gap-3 text-xs text-ink/70">
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#1f7a4d]" /> Open now
+                <span className="h-2.5 w-2.5 rounded-xs bg-[#1f7a4d]" /> Open now
               </li>
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#9f1d2a]" /> Full
+                <span className="h-2.5 w-2.5 rounded-xs bg-[#9f1d2a]" /> Full
               </li>
               <li className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#c8962e]" /> Opens later
+                <span className="h-2.5 w-2.5 rounded-xs bg-[#c8962e]" /> Opens later
               </li>
             </ul>
 
             {loading ? (
               <div className="panel p-4" aria-hidden>
-                <div className="mb-3 h-5 w-40 animate-pulse rounded bg-line" />
+                <div className="mb-3 h-5 w-40 animate-pulse rounded-sm bg-line" />
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                   {Array.from({ length: 8 }).map((_, index) => (
                     <div key={index} className="h-28 animate-pulse rounded-lg bg-[#efe7da]" />
