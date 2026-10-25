@@ -5,14 +5,14 @@ import "./globals.css";
 const sans = Source_Sans_3({
   subsets: ["latin"],
   weight: ["400", "600", "700"],
-  variable: "--font-sans",
+  variable: "--font-source-sans",
   display: "swap",
 });
 
 const display = Barlow({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
-  variable: "--font-display",
+  variable: "--font-barlow",
   display: "swap",
 });
 

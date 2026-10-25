@@ -78,7 +78,7 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch, emptyLabel }: P
                 else if (openingSoon) boxClass = "border-l-4 border-l-[#c8962e] border-line bg-soon";
 
                 return (
-                  <article key={key} className={`flex min-h-[7.5rem] flex-col rounded-lg border p-2.5 ${boxClass}`}>
+                  <article key={key} className={`flex min-h-30 flex-col rounded-lg border p-2.5 ${boxClass}`}>
                     <div className="flex items-baseline justify-between gap-2">
                       <h4 className="font-display text-base font-semibold tabular-nums">{formatHour(slot.hour)}</h4>
                       {watched ? (
@@ -109,7 +109,7 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch, emptyLabel }: P
                           href={bookingUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn-primary flex-1 !px-2 !py-1.5 text-xs"
+                          className="btn-primary flex-1 px-2! py-1.5! text-xs"
                         >
                           Book
                         </a>
@@ -118,7 +118,7 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch, emptyLabel }: P
                         type="button"
                         onClick={() => onWatch(slot.date, slot.hour)}
                         disabled={watched}
-                        className={`flex-1 !px-2 !py-1.5 text-xs ${watched ? "btn border border-line bg-white/70 text-ink" : "btn-secondary"}`}
+                        className={`flex-1 px-2! py-1.5! text-xs ${watched ? "btn border border-line bg-white/70 text-ink" : "btn-secondary"}`}
                         title={
                           openingSoon
                             ? `Email me when booking opens at ${formatOpensAt(slot.opensAt)}`
