@@ -142,6 +142,12 @@ GitHub Actions runs typecheck, unit tests, and production build on every push/PR
 
 Without Upstash, watches are stored in `data/store.json` (fine for local / Railway with disk).
 
+## Brand mark
+
+The header and browser-notification icon use `public/brand-mark.svg`, an original geometric turtle shell in red, gold, and black. This app is unofficial. It does not include UMD’s Terrapin logo, wordmark, or any other licensed university mark.
+
+To use an officially licensed asset later, replace `public/brand-mark.svg` with a square SVG of the same name. The header and notification icon both load that path, so no component changes are required.
+
 ## Disclaimer
 
 Unofficial community tool using public Planyo endpoints. Not affiliated with UMD, RecWell, or Planyo.
