@@ -136,7 +136,7 @@ A Friday 4 PM slot opens for booking Wednesday 4 PM.
 
 ## CI
 
-GitHub Actions runs typecheck, unit tests, and production build on every push/PR.
+GitHub Actions runs typecheck, unit tests, and production build on every push/PR. Commits must not include Cursor/Claude agent attribution (`Co-authored-by: Cursor`, and similar); `npm install` enables `.githooks/commit-msg` to strip those trailers locally, and CI rejects them on push/PR.
 
 ## Local storage
 
