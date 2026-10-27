@@ -47,9 +47,10 @@ export default function Dashboard() {
   const [bannerTone, setBannerTone] = useState<BannerTone>("ok");
   const [watchTarget, setWatchTarget] = useState<{ date: string; hour: number } | null>(null);
   const [lastPoll, setLastPoll] = useState<Date | null>(null);
-  const [health, setHealth] = useState<{ status: HealthStatus; lastPollAt: string | null }>({
+  const [health, setHealth] = useState<{ status: HealthStatus; lastPollAt: string | null; detail: string }>({
     status: "unknown",
     lastPollAt: null,
+    detail: "",
   });
   const [days, setDays] = useState(3);
   const [filter, setFilter] = useState<SlotFilter>("all");
@@ -78,13 +79,20 @@ export default function Dashboard() {
       const res = await fetch("/api/health");
       const data = await readJson(res);
       const status = (data.status as HealthStatus) ?? "unknown";
+      const detail =
+        typeof data.error === "string"
+          ? data.error
+          : typeof data.lastPollError === "string"
+            ? data.lastPollError
+            : "";
       setHealth({
         status,
         lastPollAt: typeof data.lastPollAt === "string" ? data.lastPollAt : null,
+        detail,
       });
       if (typeof data.lastPollAt === "string") setLastPoll(new Date(data.lastPollAt));
     } catch {
-      setHealth({ status: "unknown", lastPollAt: null });
+      setHealth({ status: "unknown", lastPollAt: null, detail: "" });
     }
   }, []);
 
@@ -299,14 +307,14 @@ export default function Dashboard() {
             </h1>
             <p className="mt-1 truncate text-[11px] font-semibold tracking-wide text-terp-red">Eppley tennis</p>
           </div>
-          <a
-            href="/api/health"
+          <span
             className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-line px-2.5 text-xs text-ink/70"
-            title={healthLabel}
+            title={health.detail ? `${healthLabel}. ${health.detail}` : healthLabel}
+            role="status"
           >
-            <span className={`h-2 w-2 rounded-full ${healthDot}`} />
+            <span className={`h-2 w-2 rounded-full ${healthDot}`} aria-hidden="true" />
             <span className="hidden sm:inline">{healthLabel}</span>
-          </a>
+          </span>
           <a
             href={PLANYO.BOOKING_URL}
             target="_blank"
@@ -484,10 +492,7 @@ export default function Dashboard() {
       </main>
 
       <footer className="border-t border-line px-4 py-4 text-center text-xs text-ink/50">
-        Unofficial community tool · Not affiliated with UMD, RecWell, or Planyo ·{" "}
-        <a href="/api/health" className="underline hover:text-ink">
-          Status
-        </a>
+        Unofficial community tool · Not affiliated with UMD, RecWell, or Planyo
       </footer>
 
       {watchTarget ? (

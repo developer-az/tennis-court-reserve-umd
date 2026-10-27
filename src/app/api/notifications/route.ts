@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRecentNotifications } from "@/lib/db";
 import { LIMITS } from "@/lib/limits";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import { describeStoreError } from "@/lib/store-error";
 import { isValidEmail, normalizeEmail } from "@/lib/validate";
 
 export async function GET(req: NextRequest) {
@@ -23,7 +24,6 @@ export async function GET(req: NextRequest) {
     const notifications = await getRecentNotifications(30, normalizeEmail(email));
     return NextResponse.json({ notifications }, { headers: rateLimitHeaders(rl) });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to load notifications";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: describeStoreError(err) }, { status: 500 });
   }
 }

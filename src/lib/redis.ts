@@ -1,11 +1,20 @@
-export function redisConfigured(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+export function redisCredentials(
+  env: NodeJS.ProcessEnv = process.env
+): { url: string; token: string } | null {
+  const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  return { url, token };
+}
+
+export function redisConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return redisCredentials(env) !== null;
 }
 
 export async function redisCommand<T>(...args: (string | number)[]): Promise<T> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) throw new Error("Redis is not configured");
+  const creds = redisCredentials();
+  if (!creds) throw new Error("Redis is not configured");
+  const { url, token } = creds;
 
   const res = await fetch(url, {
     method: "POST",

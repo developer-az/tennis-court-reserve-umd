@@ -5,6 +5,7 @@ import { LIMITS } from "@/lib/limits";
 import { sendVerificationEmail } from "@/lib/notifications";
 import { PLANYO } from "@/lib/planyo";
 import { clientIp, rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
+import { describeStoreError } from "@/lib/store-error";
 import {
   isValidDiscordWebhook,
   isValidEmail,
@@ -29,8 +30,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const watches = await getWatchesByEmail(normalizeEmail(email));
-  return NextResponse.json({ watches }, { headers: rateLimitHeaders(rl) });
+  try {
+    const watches = await getWatchesByEmail(normalizeEmail(email));
+    return NextResponse.json({ watches }, { headers: rateLimitHeaders(rl) });
+  } catch (err) {
+    return NextResponse.json(
+      { error: describeStoreError(err) },
+      { status: 500, headers: rateLimitHeaders(rl) }
+    );
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -119,7 +127,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 429 });
     }
     await reportError(err, { where: "api/watches POST" });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: describeStoreError(err) }, { status: 500 });
   }
 }
 
@@ -137,7 +145,14 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "email required to cancel a watch" }, { status: 400 });
   }
 
-  const ok = await cancelWatch(Number(id), normalizeEmail(email));
-  if (!ok) return NextResponse.json({ error: "Watch not found" }, { status: 404 });
-  return NextResponse.json({ success: true }, { headers: rateLimitHeaders(rl) });
+  try {
+    const ok = await cancelWatch(Number(id), normalizeEmail(email));
+    if (!ok) return NextResponse.json({ error: "Watch not found" }, { status: 404 });
+    return NextResponse.json({ success: true }, { headers: rateLimitHeaders(rl) });
+  } catch (err) {
+    return NextResponse.json(
+      { error: describeStoreError(err) },
+      { status: 500, headers: rateLimitHeaders(rl) }
+    );
+  }
 }
