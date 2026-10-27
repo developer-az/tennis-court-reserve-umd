@@ -164,12 +164,12 @@ export function WatchForm({ date, hour, isOpen, opensAt, onClose, onCreated }: W
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+      className="sheet-backdrop fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="panel w-full max-w-md p-5 shadow-xl"
+        className="sheet-panel panel w-full max-w-md p-5 shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"

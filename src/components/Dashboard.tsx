@@ -36,6 +36,13 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
+const FILTER_OPTIONS = [
+  { value: "all" as const, label: "All" },
+  { value: "open" as const, label: "Open" },
+  { value: "full" as const, label: "Full" },
+  { value: "soon" as const, label: "Opening" },
+] satisfies { value: SlotFilter; label: string }[];
+
 export default function Dashboard() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [watches, setWatches] = useState<Watch[]>([]);
@@ -54,6 +61,13 @@ export default function Dashboard() {
   });
   const [days, setDays] = useState(3);
   const [filter, setFilter] = useState<SlotFilter>("all");
+
+  // Sliding pill indicator
+  const pillRefs = useRef<Record<SlotFilter, HTMLButtonElement | null>>({
+    all: null, open: null, full: null, soon: null,
+  });
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+
   const knownNotifIds = useRef(new Set<number>());
   const seededFor = useRef<string | null>(null);
 
@@ -66,6 +80,20 @@ export default function Dashboard() {
       ),
     [watches]
   );
+
+  // Move the sliding pill indicator to the active button
+  useEffect(() => {
+    const btn = pillRefs.current[filter];
+    const indicator = indicatorRef.current;
+    const container = btn?.closest(".pill-group") as HTMLElement | null;
+    if (!btn || !indicator || !container) return;
+    const containerRect = container.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    indicator.style.left = `${btnRect.left - containerRect.left}px`;
+    indicator.style.width = `${btnRect.width}px`;
+    indicator.style.top = `${btnRect.top - containerRect.top}px`;
+    indicator.style.height = `${btnRect.height}px`;
+  }, [filter]);
 
   const fetchAvailability = useCallback(async () => {
     const res = await fetch(`/api/availability?days=${days}`);
@@ -289,6 +317,9 @@ export default function Dashboard() {
         ? "border-[#f3c1c1] bg-full text-[#9f1d2a]"
         : "border-[#f0ddb0] bg-soon text-[#8a5a12]";
 
+  // Suppress unused-variable lint for lastPoll (used if we ever surface it)
+  void lastPoll;
+
   return (
     <div className="flex min-h-screen flex-col">
       <a
@@ -297,7 +328,8 @@ export default function Dashboard() {
       >
         Skip to courts
       </a>
-      <header className="sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur-sm">
+      {/* Header — grain texture over the red stripe for premium depth */}
+      <header className="grain sticky top-0 z-40 border-b border-line bg-card/95 backdrop-blur-sm">
         <div className="h-1 bg-terp-red" />
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2.5 px-3 sm:gap-3 sm:px-6">
           <img src="/brand-mark.svg" alt="" width={36} height={36} className="h-9 w-9 shrink-0" />
@@ -377,6 +409,7 @@ export default function Dashboard() {
 
             <div className="sticky top-[60px] z-30 -mx-3 mb-3 border-b border-line bg-paper/95 px-3 py-2 backdrop-blur-sm sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
               <div className="flex items-center gap-2 overflow-x-auto">
+                {/* Days toggle */}
                 <div className="flex shrink-0 rounded-lg border border-line bg-card p-0.5" role="group" aria-label="Days to show">
                   {[3, 7].map((option) => (
                     <button
@@ -384,7 +417,7 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => setDays(option)}
                       aria-pressed={days === option}
-                      className={`h-9 rounded-md px-3 text-xs font-semibold sm:h-auto sm:px-2.5 sm:py-1 ${
+                      className={`h-9 rounded-md px-3 text-xs font-semibold transition-colors sm:h-auto sm:px-2.5 sm:py-1 ${
                         days === option ? "bg-ink text-card" : "text-ink/70 hover:text-ink"
                       }`}
                     >
@@ -392,27 +425,35 @@ export default function Dashboard() {
                     </button>
                   ))}
                 </div>
-                <div className="flex shrink-0 gap-1" role="group" aria-label="Filter slots">
-                  {(
-                    [
-                      ["all", "All"],
-                      ["open", `Open ${counts.open}`],
-                      ["full", `Full ${counts.full}`],
-                      ["soon", `Opening ${counts.soon}`],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setFilter(value)}
-                      aria-pressed={filter === value}
-                      className={`h-9 rounded-full px-3 text-xs font-semibold sm:h-auto sm:px-2.5 sm:py-1 ${
-                        filter === value ? "bg-ink text-card" : "bg-card text-ink/70 ring-1 ring-line hover:text-ink"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+
+                {/* Filter pills with sliding indicator */}
+                <div className="pill-group flex shrink-0 gap-1" role="group" aria-label="Filter slots">
+                  {/* Sliding indicator layer */}
+                  <span
+                    ref={indicatorRef}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute rounded-full bg-ink transition-[left,width,top,height] duration-[220ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]"
+                  />
+                  {FILTER_OPTIONS.map(({ value, label }) => {
+                    const count = value === "open" ? counts.open : value === "full" ? counts.full : value === "soon" ? counts.soon : null;
+                    return (
+                      <button
+                        key={value}
+                        ref={(el) => { pillRefs.current[value] = el; }}
+                        type="button"
+                        onClick={() => setFilter(value)}
+                        aria-pressed={filter === value}
+                        className={`relative z-10 h-9 rounded-full px-3 text-xs font-semibold transition-colors sm:h-auto sm:px-2.5 sm:py-1 ${
+                          filter === value
+                            ? "text-card"
+                            : "bg-card text-ink/70 ring-1 ring-line hover:text-ink"
+                        }`}
+                      >
+                        {label}
+                        {count !== null ? <span className="ml-1 tabular-nums opacity-70">{count}</span> : null}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               {days > 3 && filteredSlots.length > 0 ? (
@@ -449,7 +490,7 @@ export default function Dashboard() {
                 <div className="h-12 border-b border-line bg-[#f7f1e6]" />
                 <div className="sm:grid sm:grid-cols-3 sm:gap-2 sm:p-3 lg:grid-cols-4">
                   {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="h-14 animate-pulse border-b border-line bg-[#efe7da] sm:h-28 sm:rounded-lg sm:border" />
+                    <div key={index} className="skeleton h-14 border-b border-line sm:h-28 sm:rounded-lg sm:border" />
                   ))}
                 </div>
               </div>

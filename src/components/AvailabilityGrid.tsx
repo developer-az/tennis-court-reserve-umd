@@ -46,6 +46,8 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch, emptyLabel }: P
     );
   }
 
+  let globalIndex = 0;
+
   return (
     <div className="space-y-4">
       {dates.map((date) => {
@@ -71,6 +73,7 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch, emptyLabel }: P
                 const openingSoon = !slot.isOpen;
                 const bookable = slot.isBookable;
                 const bookingUrl = buildBookingLink(slot.date, slot.hour);
+                const cardIndex = globalIndex++;
 
                 let boxClass = "border-l-ink/15 bg-white sm:border-line";
                 if (bookable) boxClass = "border-l-[#1f7a4d] bg-white sm:border-line sm:bg-open";
@@ -80,7 +83,8 @@ export function AvailabilityGrid({ slots, watchedSlots, onWatch, emptyLabel }: P
                 return (
                   <article
                     key={key}
-                    className={`flex items-center gap-2 border-l-4 px-3 py-2 max-sm:border-b max-sm:last:border-b-0 sm:min-h-30 sm:flex-col sm:items-stretch sm:rounded-lg sm:border sm:p-2.5 ${boxClass}`}
+                    className={`slot-card flex items-center gap-2 border-l-4 px-3 py-2 max-sm:border-b max-sm:last:border-b-0 sm:min-h-30 sm:flex-col sm:items-stretch sm:rounded-lg sm:border sm:p-2.5 sm:transition-shadow sm:duration-200 sm:hover:shadow-sm ${boxClass}`}
+                    style={{ "--stagger-i": cardIndex } as React.CSSProperties}
                   >
                     <h4 className="shrink-0 font-display text-base font-semibold whitespace-nowrap tabular-nums">
                       {formatHour(slot.hour)}

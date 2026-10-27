@@ -41,6 +41,7 @@
     --terp-red: #e03a3e;
     --terp-gold: #ffd520;
     --terp-black: #1a1a1a;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   body {
@@ -48,6 +49,117 @@
     color: #1c1916;
   }
 }
+
+/* ─── Motion keyframes ─────────────────────────────────────── */
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    translate: 0 20px;
+    scale: 0.98;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* ─── Slot card stagger ────────────────────────────────────── */
+
+.slot-card {
+  animation: row-in 320ms var(--ease-out) both;
+  animation-delay: calc(var(--stagger-i, 0) * 28ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-card {
+    animation: none;
+  }
+}
+
+/* ─── Sheet modal enter ────────────────────────────────────── */
+
+.sheet-backdrop {
+  animation: overlay-in 200ms ease both;
+}
+
+.sheet-panel {
+  animation: sheet-in 280ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-backdrop,
+  .sheet-panel {
+    animation: none;
+  }
+}
+
+/* ─── Skeleton shimmer ─────────────────────────────────────── */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #efe7da 25%,
+    #e8ddd1 50%,
+    #efe7da 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: #efe7da;
+  }
+}
+
+/* ─── Grain overlay ────────────────────────────────────────── */
+
+.grain {
+  position: relative;
+}
+
+.grain::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  mix-blend-mode: multiply;
+  border-radius: inherit;
+}
+
+/* ─── Filter-pill sliding indicator ───────────────────────── */
+
+.pill-group {
+  position: relative;
+}
+
+/* ─── Utilities ─────────────────────────────────────────────── */
 
 @utility panel {
   @apply rounded-xl border border-line bg-card;
@@ -60,11 +172,11 @@
 }
 
 @utility btn-primary {
-  @apply btn bg-terp-gold text-ink hover:bg-[#f0c400];
+  @apply btn bg-terp-gold text-ink hover:bg-[#f0c400] active:scale-[0.97];
 }
 
 @utility btn-secondary {
-  @apply btn border border-line bg-card text-ink hover:bg-[#f7f1e6];
+  @apply btn border border-line bg-card text-ink hover:bg-[#f7f1e6] active:scale-[0.97];
 }
 
 @utility btn-ghost {
@@ -73,7 +185,8 @@
 
 @utility field {
   @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm
-      outline-hidden placeholder:text-ink/40 focus:border-ink focus:ring-1 focus:ring-ink;
+      outline-hidden placeholder:text-ink/40 focus:border-ink focus:ring-1 focus:ring-ink
+      transition-[border-color,box-shadow] duration-150;
 }
 
 @utility label {
